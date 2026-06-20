@@ -1,0 +1,582 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Poker Room</title>
+    <link rel="stylesheet" href="styles.css?v=auto-hand-stats-1" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true">P</div>
+          <div>
+            <h1>Poker Room</h1>
+            <p>Texas Hold'em · virtual chips</p>
+          </div>
+        </div>
+        <div class="topbar-actions">
+          <div class="auth-links" aria-label="Account links">
+            <button
+              class="profile-avatar topbar-avatar"
+              id="topbarAvatar"
+              type="button"
+              title="Edit profile"
+              aria-label="Edit profile"
+              aria-expanded="false"
+            >
+              <span class="profile-avatar-fallback">P</span>
+            </button>
+            <div class="profile-summary is-hidden" id="profileSummary" aria-label="Signed in profile">
+              <span class="auth-status" id="authStatus">Not signed in</span>
+              <span class="profile-summary-meta" id="profileSummaryMeta">Choose a role</span>
+              <span class="profile-summary-stats" id="profileSummaryStats">0 won · 0 played</span>
+            </div>
+            <button class="link-button" id="signInLink" type="button">Sign In</button>
+            <button class="link-button" id="signUpLink" type="button">Sign Up</button>
+            <button class="link-button" id="guestLink" type="button">Guest</button>
+            <button class="link-button is-hidden" id="signOutButton" type="button">Sign Out</button>
+            <button class="link-button sound-toggle" id="soundToggleButton" type="button" aria-pressed="true">
+              Sound On
+            </button>
+          </div>
+          <div class="topbar-stats" id="topbarStats">
+            <span>Lobby</span>
+            <strong>Roles first</strong>
+          </div>
+        </div>
+      </header>
+
+      <main>
+        <section class="setup-grid" id="setupPanel">
+          <form class="setup-panel" id="tableForm">
+            <section class="welcome-panel" aria-labelledby="welcomeTitle">
+              <img
+                class="welcome-art"
+                src="assets/poker-aces-welcome.png"
+                alt="Ace of spades and ace of hearts with poker chips on green felt"
+              />
+              <div class="welcome-copy">
+                <span class="eyebrow" id="setupEyebrow">Player access</span>
+                <h2 id="welcomeTitle">Welcome to the Poker Room</h2>
+                <p id="setupTitle">Sign in, create an account, or continue as a guest.</p>
+              </div>
+            </section>
+
+            <section class="role-home" id="roleHome" aria-label="Current role workspace">
+              <div class="role-home-head">
+                <span class="eyebrow" id="roleHomeEyebrow">Workspace</span>
+                <strong id="roleHomeTitle">Choose how you want to enter</strong>
+              </div>
+              <div class="role-home-grid" id="roleHomeGrid"></div>
+            </section>
+
+            <section class="auth-panel is-hidden" id="authPanel" aria-label="Account form">
+              <div class="auth-panel-head">
+                <strong id="authPanelTitle">Sign In</strong>
+                <button class="link-button" id="authCloseButton" type="button">Close</button>
+              </div>
+              <label id="authUserIdGroup">
+                User ID
+                <input
+                  id="authUserId"
+                  type="text"
+                  maxlength="24"
+                  autocomplete="username"
+                  placeholder="example_user"
+                />
+              </label>
+              <label id="authNameGroup">
+                Display name
+                <input
+                  id="authName"
+                  type="text"
+                  maxlength="24"
+                  autocomplete="nickname"
+                  placeholder="Name shown at the table"
+                />
+              </label>
+              <label id="authRoleGroup">
+                Account role
+                <select id="authRole">
+                  <option value="host">Host</option>
+                  <option value="player" selected>Player</option>
+                  <option value="admin">Admin</option>
+                </select>
+              </label>
+              <label id="authPasswordGroup">
+                Password
+                <input
+                  id="authPassword"
+                  type="password"
+                  maxlength="128"
+                  autocomplete="current-password"
+                  placeholder="At least 8 characters"
+                />
+              </label>
+              <section class="photo-field" id="authPhotoGroup" aria-label="Profile photo">
+                <span>Profile photo <small>Optional</small></span>
+                <div class="photo-picker">
+                  <span class="profile-avatar profile-photo-preview" id="profilePhotoPreview" aria-hidden="true">
+                    <span class="profile-avatar-fallback">P</span>
+                  </span>
+                  <div class="photo-picker-actions">
+                    <label class="upload-button" for="profilePhotoInput">Choose Photo</label>
+                    <input
+                      id="profilePhotoInput"
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                    />
+                    <button class="link-button is-hidden" id="removeProfilePhotoButton" type="button">
+                      Remove photo
+                    </button>
+                    <small>JPG, PNG, or WebP. The image is cropped to a square.</small>
+                  </div>
+                </div>
+              </section>
+              <fieldset class="guest-practice-options is-hidden" id="guestPracticeOptions">
+                <legend>Practice visibility</legend>
+                <div class="segmented mode-toggle">
+                  <label>
+                    <input type="radio" name="guestMode" value="masked" checked />
+                    <span>Masked <small>Hide opponents</small></span>
+                  </label>
+                  <label>
+                    <input type="radio" name="guestMode" value="unmasked" />
+                    <span>Unmasked <small>Show opponents</small></span>
+                  </label>
+                </div>
+              </fieldset>
+              <button class="primary-action" id="authSubmitButton" type="button">Continue as Player</button>
+              <p class="notice" id="authNotice" role="status"></p>
+            </section>
+
+            <label id="playerIdentityGroup" class="is-hidden">
+              Player name
+              <input id="playerName" name="playerName" type="text" maxlength="24" value="Prashu" readonly />
+            </label>
+
+            <section class="workflow-section is-hidden" id="createTableSection">
+              <div class="workflow-heading">
+                <span class="eyebrow">Host controls</span>
+                <strong>Create a poker room</strong>
+              </div>
+
+              <label>
+                Room name
+                <input id="tableName" name="tableName" type="text" maxlength="36" placeholder="Enter a unique room name" />
+              </label>
+
+              <fieldset>
+                <legend>Game format</legend>
+                <div class="segmented mode-toggle">
+                  <label>
+                    <input type="radio" name="gameType" value="cash" checked />
+                    <span>Cash game <small>Fixed blinds</small></span>
+                  </label>
+                  <label>
+                    <input type="radio" name="gameType" value="tournament" />
+                    <span>Tournament <small>Timed levels</small></span>
+                  </label>
+                </div>
+              </fieldset>
+
+              <div class="form-row">
+                <label>
+                  Seats
+                  <select name="seatCount">
+                    <option value="9" selected>9 seats</option>
+                  </select>
+                </label>
+                <label>
+                  Blinds
+                  <select name="blindPreset">
+                    <option value="5:10">5 / 10</option>
+                    <option value="10:20" selected>10 / 20</option>
+                    <option value="15:30">15 / 30</option>
+                    <option value="25:50">25 / 50</option>
+                    <option value="50:100">50 / 100</option>
+                    <option value="75:150">75 / 150</option>
+                    <option value="100:200">100 / 200</option>
+                    <option value="150:300">150 / 300</option>
+                    <option value="200:400">200 / 400</option>
+                    <option value="250:500">250 / 500</option>
+                    <option value="500:1000">500 / 1,000</option>
+                  </select>
+                </label>
+              </div>
+
+              <div class="tournament-options is-hidden" id="tournamentOptions">
+                <div class="workflow-heading">
+                  <span class="eyebrow">Tournament structure</span>
+                  <strong>Blind level timer</strong>
+                </div>
+                <label>
+                  Minutes per blind level
+                  <select name="blindLevelMinutes">
+                    <option value="1">1 minute</option>
+                    <option value="3">3 minutes</option>
+                    <option value="5">5 minutes</option>
+                    <option value="10" selected>10 minutes</option>
+                    <option value="15">15 minutes</option>
+                    <option value="20">20 minutes</option>
+                    <option value="30">30 minutes</option>
+                  </select>
+                </label>
+                <p class="field-note">The clock starts with the first hand. Blinds advance automatically at the next hand.</p>
+              </div>
+
+              <label>
+                Starting stack
+                <select name="startingStack">
+                  <option value="1000">1,000</option>
+                  <option value="1500" selected>1,500</option>
+                  <option value="3000">3,000</option>
+                  <option value="5000">5,000</option>
+                  <option value="10000">10,000</option>
+                  <option value="20000">20,000</option>
+                  <option value="50000">50,000</option>
+                </select>
+              </label>
+
+              <div class="host-create-actions">
+                <button class="primary-action" id="openTableButton" type="button">Open Table</button>
+                <button class="ghost-button" id="createStayButton" type="button">Create & Stay</button>
+              </div>
+            </section>
+
+            <section class="host-rooms is-hidden" id="hostRoomsSection">
+              <div class="host-rooms-head">
+                <div>
+                  <span class="eyebrow">Host dashboard</span>
+                  <strong>Active rooms</strong>
+                </div>
+                <button class="link-button" id="hostRoomsRefreshButton" type="button">Refresh</button>
+              </div>
+              <div class="host-dashboard-stats" id="hostDashboardStats" aria-label="Host room summary"></div>
+              <div class="host-room-list" id="hostRoomList"></div>
+              <p class="notice" id="hostRoomsNotice" role="status"></p>
+            </section>
+
+            <section class="tournament-lobby is-hidden" id="tournamentLobbySection">
+              <div class="host-rooms-head">
+                <div>
+                  <span class="eyebrow">Player lobby</span>
+                  <strong>Available tables</strong>
+                </div>
+                <button class="link-button" id="tournamentsRefreshButton" type="button">Refresh</button>
+              </div>
+              <div class="tournament-list" id="tournamentList"></div>
+              <p class="notice" id="tournamentsNotice" role="status"></p>
+            </section>
+
+            <section class="workflow-section is-hidden" id="joinTableSection">
+              <div class="workflow-heading">
+                <span class="eyebrow">Room access</span>
+                <strong id="joinTableTitle">Join an existing table</strong>
+              </div>
+              <label>
+                Room name or code
+                <input
+                  id="roomCodeInput"
+                  type="text"
+                  maxlength="36"
+                  autocomplete="off"
+                  placeholder="Demo or DFIYE5"
+                />
+              </label>
+              <button class="ghost-button" id="joinTableButton" type="button">Join Table</button>
+            </section>
+
+            <section class="admin-users is-hidden" id="adminPanel">
+              <div class="admin-users-head">
+                <div>
+                  <span class="eyebrow">Admin dashboard</span>
+                  <strong>Registered users</strong>
+                </div>
+                <button class="link-button" id="adminRefreshButton" type="button">Refresh</button>
+              </div>
+
+              <div class="admin-summary" id="adminSummary" aria-label="Registered user summary"></div>
+              <div class="admin-role-filters" id="adminRoleFilters" aria-label="Filter users by role"></div>
+
+              <label class="admin-search">
+                Search users
+                <input
+                  id="adminUserSearch"
+                  type="search"
+                  maxlength="40"
+                  autocomplete="off"
+                  placeholder="Display name or user id"
+                />
+              </label>
+
+              <div class="admin-bulk-actions">
+                <label class="admin-select-all">
+                  <input id="adminSelectAll" type="checkbox" />
+                  Select all users
+                </label>
+                <button id="adminActivateButton" type="button">Set Active</button>
+                <button id="adminDeactivateButton" type="button">Set Inactive</button>
+              </div>
+
+              <div class="admin-table-wrap">
+                <table class="admin-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">Select</th>
+                      <th scope="col">User</th>
+                      <th scope="col">Role</th>
+                      <th scope="col">Status</th>
+                      <th scope="col">Access</th>
+                    </tr>
+                  </thead>
+                  <tbody id="adminUsersBody"></tbody>
+                </table>
+              </div>
+              <p class="notice" id="adminNotice" role="status"></p>
+            </section>
+
+            <p class="notice" id="setupNotice" role="status"></p>
+          </form>
+
+          <aside class="roles-panel" aria-label="Role model">
+            <div class="role-panel-head">
+              <span class="eyebrow">Role model</span>
+              <strong id="roleGuideTitle">Player</strong>
+            </div>
+            <div class="role-row" data-role-card="guest">
+              <span>Guest</span>
+              <strong>Play</strong>
+              <small>Temporary identity</small>
+            </div>
+            <div class="role-row active" data-role-card="player">
+              <span>Player</span>
+              <strong>Play</strong>
+              <small>Bet · call · fold</small>
+            </div>
+            <div class="role-row" data-role-card="host">
+              <span>Host</span>
+              <strong>Create</strong>
+              <small>Seats · next hand</small>
+            </div>
+            <div class="role-row" data-role-card="admin">
+              <span>Admin</span>
+              <strong>Manage</strong>
+              <small>Roles · table</small>
+            </div>
+            <div class="role-row system">
+              <span>Dealer system</span>
+              <strong>Deal</strong>
+              <small>Shuffle · blinds</small>
+            </div>
+          </aside>
+        </section>
+
+        <section class="leaderboard-panel" id="leaderboardPanel" aria-label="Player rankings">
+          <div class="leaderboard-head">
+            <div>
+              <span class="eyebrow">Session rankings</span>
+              <h2>Player leaderboard</h2>
+            </div>
+            <button class="link-button" id="rankingsRefreshButton" type="button">Refresh</button>
+          </div>
+          <div class="leaderboard-list" id="leaderboardList"></div>
+          <p class="notice" id="rankingsNotice" role="status"></p>
+        </section>
+
+        <section class="table-panel is-hidden" id="tablePanel">
+          <section class="table-header">
+            <div>
+              <span class="eyebrow">Table</span>
+              <strong id="tableTitle">Velvet Room</strong>
+            </div>
+            <div>
+              <span class="eyebrow">Room code</span>
+              <strong id="roomCodeLabel">------</strong>
+            </div>
+            <div>
+              <span class="eyebrow">Pot</span>
+              <strong id="potTotal">0</strong>
+            </div>
+            <div>
+              <span class="eyebrow">Street</span>
+              <strong id="phaseLabel">Preflop</strong>
+            </div>
+            <div>
+              <span class="eyebrow">Role</span>
+              <strong id="roleLabel">Host</strong>
+            </div>
+            <div>
+              <span class="eyebrow">Mode</span>
+              <strong id="modeLabel">Masked</strong>
+            </div>
+            <button class="ghost-button" id="leaveButton" type="button">Lobby</button>
+          </section>
+
+          <section class="tournament-banner is-hidden" id="tournamentBanner" aria-label="Tournament blind clock">
+            <div>
+              <span class="eyebrow">Tournament</span>
+              <strong id="tournamentLevel">Level 1</strong>
+            </div>
+            <div>
+              <span class="eyebrow">Blinds</span>
+              <strong id="tournamentBlinds">10 / 20</strong>
+            </div>
+            <div>
+              <span class="eyebrow">Level clock</span>
+              <strong id="tournamentClock">10:00</strong>
+            </div>
+            <div>
+              <span class="eyebrow">Next level</span>
+              <strong id="tournamentNextBlinds">15 / 30</strong>
+            </div>
+            <p id="tournamentNotice">Clock starts with the first hand.</p>
+          </section>
+
+          <section class="felt-layout">
+            <div class="table-felt">
+              <div class="seats-grid" id="playersGrid"></div>
+
+              <div class="board-zone">
+                <div class="dealer-chip" id="dealerChip">D</div>
+                <div class="community-row" id="communityRow"></div>
+                <div class="pot-chip">
+                  <span>Pot</span>
+                  <strong id="centerPot">0</strong>
+                </div>
+                <p id="tableMessage">Your turn.</p>
+              </div>
+            </div>
+
+            <aside class="side-panel">
+              <div class="side-section">
+                <span class="eyebrow">Hand history</span>
+                <ol class="event-log" id="eventLog"></ol>
+              </div>
+              <div class="side-section">
+                <span class="eyebrow">Showdown</span>
+                <div class="showdown-list" id="showdownList"></div>
+              </div>
+            </aside>
+          </section>
+
+          <section class="player-console">
+            <div class="hand-zone">
+              <div>
+                <span class="eyebrow">Your hand</span>
+                <h2 id="handStatus">Hole cards</h2>
+                <p class="hand-equity" id="humanWinChance">Win chance --</p>
+              </div>
+              <div class="hole-row" id="humanCards"></div>
+            </div>
+
+            <div class="action-console">
+              <div class="amount-control">
+                <label for="amountInput">Amount</label>
+                <input id="amountInput" type="range" min="20" max="1500" step="10" value="40" />
+                <output id="amountOutput">40</output>
+              </div>
+              <div class="button-grid">
+                <button id="foldButton" type="button">Fold</button>
+                <button id="checkButton" type="button">Check</button>
+                <button id="callButton" type="button">Call</button>
+                <button id="betButton" type="button">Bet</button>
+                <button id="raiseButton" type="button">Raise</button>
+                <button id="allInButton" type="button">All In</button>
+                <button class="primary-action is-hidden" id="nextHandButton" type="button">Next Hand</button>
+              </div>
+              <p class="notice" id="actionNotice" role="status"></p>
+            </div>
+          </section>
+
+          <section class="viewer-console is-hidden" id="viewerConsole" aria-label="View-only room access">
+            <div>
+              <span class="eyebrow" id="viewerEyebrow">View room</span>
+              <h2 id="viewerTitle">Watching as <span id="viewerRoleLabel">Host</span></h2>
+            </div>
+            <p id="viewerMessage">You can follow the hand and table activity, but you do not occupy a seat or receive player actions.</p>
+          </section>
+
+          <section class="seat-picker-console is-hidden" id="seatPickerConsole" aria-label="Choose an available seat">
+            <div>
+              <span class="eyebrow">Available seats</span>
+              <h2>Choose where you want to sit</h2>
+              <p>Select one open seat to join the table as a player.</p>
+            </div>
+            <div class="seat-picker-buttons" id="seatPickerButtons"></div>
+            <p class="notice" id="seatPickerNotice" role="status"></p>
+          </section>
+        </section>
+      </main>
+
+      <section class="profile-dialog is-hidden" id="profileDialog" aria-label="Edit profile">
+        <div class="profile-dialog-head">
+          <div>
+            <span class="eyebrow">Your profile</span>
+            <strong>Update profile</strong>
+          </div>
+          <button class="link-button" id="profileCloseButton" type="button">Close</button>
+        </div>
+        <label>
+          Display name
+          <input
+            id="profileDisplayName"
+            type="text"
+            maxlength="24"
+            autocomplete="nickname"
+            placeholder="Name shown at the table"
+          />
+        </label>
+        <section class="profile-stats" aria-label="Session statistics">
+          <div>
+            <span>Hands played</span>
+            <strong id="profileHandsPlayed">0</strong>
+          </div>
+          <div>
+            <span>Hands won</span>
+            <strong id="profileHandsWon">0</strong>
+          </div>
+        </section>
+        <section class="photo-field" aria-label="Update profile photo">
+          <span>Profile photo <small>Optional</small></span>
+          <div class="photo-picker">
+            <button
+              class="profile-avatar profile-photo-preview profile-photo-button"
+              id="profileEditPreview"
+              type="button"
+              title="Enlarge profile photo"
+              aria-label="Enlarge profile photo"
+            >
+              <span class="profile-avatar-fallback">P</span>
+            </button>
+            <div class="photo-picker-actions">
+              <label class="upload-button" for="profileEditPhotoInput">Choose Photo</label>
+              <input
+                id="profileEditPhotoInput"
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+              />
+              <button class="link-button" id="profileEditRemoveButton" type="button">Remove photo</button>
+              <small>JPG, PNG, or WebP. The image is cropped to a square.</small>
+            </div>
+          </div>
+        </section>
+        <button class="primary-action" id="profileSaveButton" type="button">Save Profile</button>
+        <p class="notice" id="profileNotice" role="status"></p>
+      </section>
+
+      <section class="photo-lightbox is-hidden" id="photoLightbox" aria-label="Enlarged profile photo">
+        <button class="photo-lightbox-backdrop" id="photoLightboxBackdrop" type="button" aria-label="Close enlarged photo"></button>
+        <div class="photo-lightbox-content">
+          <button class="photo-lightbox-close" id="photoLightboxClose" type="button" aria-label="Close enlarged photo">×</button>
+          <div class="photo-lightbox-image" id="photoLightboxImage"></div>
+          <strong id="photoLightboxName">Profile photo</strong>
+        </div>
+      </section>
+    </div>
+
+    <script src="app.js?v=auto-hand-stats-1"></script>
+  </body>
+</html>
