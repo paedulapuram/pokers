@@ -344,7 +344,20 @@ function createUserStoreError(status, message) {
 }
 
 module.exports = {
+  ACCOUNT_ROLE_SET,
+  RESERVED_ACCOUNTS,
   UserStore,
+  createUserStoreError,
+  getReservedAccountRole,
+  getReservedSignupRole,
+  hashPassword,
+  isReservedAccount,
+  isUserActive,
   normalizeAccountRole,
+  normalizePlayerName,
+  normalizeProfileImage,
   normalizeUserId,
+  passwordMatches,
+  toPublicUser,
+  validatePassword,
 };

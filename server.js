@@ -26,10 +26,12 @@ const {
 const { hasPermission } = require("./src/rolePermissions");
 const { buildPublicSession } = require("./src/sessionModel");
 const { UserStore } = require("./src/userStore");
+const { PostgresUserStore } = require("./src/postgresUserStore");
 
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || "0.0.0.0";
 const APP_MOUNT = "/poker";
+const DATABASE_URL = process.env.DATABASE_URL || "";
 const USERS_FILE = process.env.POKER_USERS_FILE || path.join(__dirname, "data", "users.json");
 const ROLE_TEST_PASSWORD = process.env.POKER_ROLE_PASSWORD || "poker-test";
 const pokerTables = new Map();
@@ -39,7 +41,7 @@ const tableIdsByRoomName = new Map();
 const spectatorTableIdsByPlayer = new Map();
 const playerStats = new Map();
 const nextHandTimers = new Map();
-const userStore = new UserStore(USERS_FILE);
+const userStore = createUserStore();
 const publicFiles = new Set([
   "index.html",
   "styles.css",
@@ -868,12 +870,14 @@ const server = http.createServer((req, res) => {
   const url = new URL(req.url, `http://${req.headers.host || "localhost"}`);
 
   Promise.resolve()
-    .then(() => {
+    .then(async () => {
       if ((url.pathname === "/api/health" || url.pathname === "/health") && req.method === "GET") {
+        const storage = await getStorageHealth();
         sendJson(res, 200, {
           status: "ok",
           app: "poker-room",
           uptimeSeconds: Math.round(process.uptime()),
+          storage,
         });
         return null;
       }
@@ -898,10 +902,27 @@ const server = http.createServer((req, res) => {
 });
 
 async function startServer() {
+  if (typeof userStore.init === "function") {
+    await userStore.init();
+  }
   await userStore.ensureReservedAccounts();
   server.listen(PORT, HOST, () => {
     console.log(`Poker server listening on http://${HOST}:${PORT}${APP_MOUNT}/`);
   });
+}
+
+function createUserStore() {
+  if (DATABASE_URL) {
+    return new PostgresUserStore(DATABASE_URL);
+  }
+  return new UserStore(USERS_FILE);
+}
+
+async function getStorageHealth() {
+  if (typeof userStore.healthCheck === "function") {
+    return userStore.healthCheck();
+  }
+  return { storage: "file" };
 }
 
 startServer().catch((error) => {

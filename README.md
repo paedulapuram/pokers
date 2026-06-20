@@ -134,6 +134,55 @@ it still stores active rooms and sessions in server memory. If Render restarts t
 service, active rooms and sign-in sessions can reset. The next production step is
 to move users, sessions, tables, and rankings to Postgres.
 
+## Add Render Postgres
+
+The app supports Postgres for registered users when `DATABASE_URL` is set. If
+`DATABASE_URL` is empty, the app keeps using the local file `data/users.json`.
+
+### 1. Create A Database
+
+1. Open `https://dashboard.render.com`.
+2. Click `New`.
+3. Choose `PostgreSQL`.
+4. Name it `pokers-db`.
+5. Pick the same region as the web service.
+6. Create the database.
+
+### 2. Connect The Database To The Web Service
+
+1. Open the `pokers` web service in Render.
+2. Go to `Environment`.
+3. Add or update:
+
+```text
+DATABASE_URL=<the Render Postgres internal database URL>
+PGSSLMODE=require
+```
+
+Render shows the database URLs on the Postgres database page. Use the internal
+database URL when the web service and database are in the same Render region.
+
+### 3. Deploy Again
+
+Click `Manual Deploy` on the web service. On startup, the app creates the
+`poker_users` table automatically and provisions the reserved `Host` and `Admin`
+accounts.
+
+### 4. What Is Stored In Postgres Now
+
+Postgres currently stores registered accounts:
+
+- user IDs
+- display names
+- password hashes
+- roles
+- active/inactive status
+- profile photos
+- reserved Host/Admin accounts
+
+Active tables, seats, current hands, sessions, and rankings are still stored in
+server memory. Those should move to Postgres or Redis in the next database step.
+
 ## Test
 
 ```bash

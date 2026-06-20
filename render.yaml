@@ -13,3 +13,7 @@ services:
         value: 0.0.0.0
       - key: POKER_ROLE_PASSWORD
         generateValue: true
+      - key: DATABASE_URL
+        sync: false
+      - key: PGSSLMODE
+        value: require
