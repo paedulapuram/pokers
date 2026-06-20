@@ -60,6 +60,80 @@ To use another port:
 PORT=4000 npm run dev
 ```
 
+## Deploy Online With Render
+
+Render can run this project directly from GitHub. Use this for the first online
+version before adding Postgres persistence.
+
+### 1. Confirm The GitHub Repo
+
+Use the repo:
+
+```text
+https://github.com/paedulapuram/pokers
+```
+
+The app is expected to live at the root of the repo, with `package.json`,
+`server.js`, `index.html`, and `render.yaml` all in the top-level folder.
+
+### 2. Create The Web Service
+
+1. Open `https://dashboard.render.com`.
+2. Click `New`.
+3. Choose `Web Service`.
+4. Connect GitHub if Render asks for access.
+5. Select `paedulapuram/pokers`.
+6. Use the `main` branch.
+
+Render can read `render.yaml`, but if you enter the settings manually, use:
+
+```text
+Runtime: Node
+Build Command: npm install
+Start Command: npm start
+Health Check Path: /api/health
+```
+
+### 3. Environment Variables
+
+Add these environment variables in Render if they are not created from
+`render.yaml` automatically:
+
+```text
+NODE_ENV=production
+HOST=0.0.0.0
+POKER_ROLE_PASSWORD=<choose a private value>
+```
+
+Do not set `PORT` manually on Render. Render provides it automatically.
+
+### 4. Open The Online App
+
+After deploy succeeds, Render gives a public URL like:
+
+```text
+https://your-service-name.onrender.com
+```
+
+Open the Poker app at:
+
+```text
+https://your-service-name.onrender.com/poker/
+```
+
+Check server health at:
+
+```text
+https://your-service-name.onrender.com/api/health
+```
+
+### 5. Current Online Limitation
+
+This first deployment is good for testing from multiple browsers and devices, but
+it still stores active rooms and sessions in server memory. If Render restarts the
+service, active rooms and sign-in sessions can reset. The next production step is
+to move users, sessions, tables, and rankings to Postgres.
+
 ## Test
 
 ```bash

@@ -28,6 +28,7 @@ const { buildPublicSession } = require("./src/sessionModel");
 const { UserStore } = require("./src/userStore");
 
 const PORT = Number(process.env.PORT || 3000);
+const HOST = process.env.HOST || "0.0.0.0";
 const APP_MOUNT = "/poker";
 const USERS_FILE = process.env.POKER_USERS_FILE || path.join(__dirname, "data", "users.json");
 const ROLE_TEST_PASSWORD = process.env.POKER_ROLE_PASSWORD || "poker-test";
@@ -868,6 +869,14 @@ const server = http.createServer((req, res) => {
 
   Promise.resolve()
     .then(() => {
+      if ((url.pathname === "/api/health" || url.pathname === "/health") && req.method === "GET") {
+        sendJson(res, 200, {
+          status: "ok",
+          app: "poker-room",
+          uptimeSeconds: Math.round(process.uptime()),
+        });
+        return null;
+      }
       if (url.pathname.startsWith("/api/auth/")) {
         return handleAuthApi(req, res, url);
       }
@@ -890,8 +899,8 @@ const server = http.createServer((req, res) => {
 
 async function startServer() {
   await userStore.ensureReservedAccounts();
-  server.listen(PORT, "127.0.0.1", () => {
-    console.log(`Poker server listening on http://127.0.0.1:${PORT}${APP_MOUNT}/`);
+  server.listen(PORT, HOST, () => {
+    console.log(`Poker server listening on http://${HOST}:${PORT}${APP_MOUNT}/`);
   });
 }
 
