@@ -120,6 +120,11 @@ const els = {
   handStatus: document.querySelector("#handStatus"),
   humanWinChance: document.querySelector("#humanWinChance"),
   humanCards: document.querySelector("#humanCards"),
+  learningCoachPanel: document.querySelector("#learningCoachPanel"),
+  learningCoachBadge: document.querySelector("#learningCoachBadge"),
+  learningCoachTitle: document.querySelector("#learningCoachTitle"),
+  learningCoachRecommendation: document.querySelector("#learningCoachRecommendation"),
+  learningCoachTips: document.querySelector("#learningCoachTips"),
   amountInput: document.querySelector("#amountInput"),
   amountOutput: document.querySelector("#amountOutput"),
   foldButton: document.querySelector("#foldButton"),
@@ -196,6 +201,7 @@ const state = {
   session: storedSession,
   setupNotice: "",
   actionNotice: "",
+  seatClaimBusy: false,
   botTurnTimer: null,
   botTurnKey: "",
   botTurnBusy: false,
@@ -410,6 +416,12 @@ els.seatPickerButtons.addEventListener("click", (event) => {
   const button = event.target.closest("[data-seat-number]");
   if (button instanceof HTMLButtonElement) {
     claimSeat(Number(button.dataset.seatNumber));
+  }
+});
+els.playersGrid.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-open-seat-number]");
+  if (button instanceof HTMLButtonElement) {
+    claimSeat(Number(button.dataset.openSeatNumber));
   }
 });
 
@@ -816,8 +828,12 @@ async function joinTable() {
 
 async function claimSeat(seatNumber) {
   if (!state.table?.name || !Number.isInteger(seatNumber)) return;
-  els.seatPickerNotice.textContent = `Claiming seat ${seatNumber}...`;
+  if (state.seatClaimBusy) return;
+  state.seatClaimBusy = true;
+  state.actionNotice = `Claiming seat ${seatNumber}...`;
+  els.seatPickerNotice.textContent = state.actionNotice;
   disableSeatPicker(true);
+  render();
 
   try {
     state.table = await apiFetch("/api/poker/tables/join", {
@@ -829,10 +845,17 @@ async function claimSeat(seatNumber) {
     resetActionSoundTracking(state.table);
     render();
   } catch (error) {
+    state.actionNotice = error.message;
     els.seatPickerNotice.textContent = error.message;
     await refreshTable();
   } finally {
+    state.seatClaimBusy = false;
     disableSeatPicker(false);
+    if (state.table?.viewerMode === "seat-selection") {
+      render();
+    } else {
+      renderNotice();
+    }
   }
 }
 
@@ -928,7 +951,7 @@ function renderTable() {
   els.modeLabel.textContent = titleCase(table.mode);
   renderTournamentStatus(table);
   els.playerConsole.classList.toggle("is-hidden", !isPlayer);
-  els.seatPickerConsole.classList.toggle("is-hidden", !isSeatSelection);
+  els.seatPickerConsole.classList.add("is-hidden");
   els.viewerConsole.classList.toggle("is-hidden", !(isSpectator || isWaiting));
   if (isWaiting) {
     els.viewerEyebrow.textContent = "Waiting for a seat";
@@ -941,9 +964,10 @@ function renderTable() {
     els.viewerMessage.textContent =
       "You can follow the hand and table activity, but you do not occupy a seat or receive player actions.";
   }
-  renderSeatPicker(table);
   els.tableMessage.textContent =
-    table.status === "hand-complete"
+    isSeatSelection
+      ? "Choose an open seat directly on the table."
+      : table.status === "hand-complete"
       ? `${table.message} Next hand starts automatically in a few seconds.`
       : table.message;
   if (table.status === "hand-complete") refreshStatsAfterHand(table);
@@ -955,7 +979,7 @@ function renderTable() {
       renderSeat(player, slotIndex, table.config.seatCount, seatNumber),
     ),
     ...seatLayout.open.map(({ slotIndex, seatNumber }) =>
-      renderOpenSeat(slotIndex, seatNumber),
+      renderOpenSeat(slotIndex, seatNumber, isSeatSelection && table.availableSeats?.includes(seatNumber)),
     ),
   ].join("");
   els.communityRow.innerHTML = renderCommunity(table.community);
@@ -964,6 +988,7 @@ function renderTable() {
   els.showdownList.innerHTML = renderShowdown(table);
 
   renderControls(table, human);
+  renderLearningCoach(table);
   playActionSounds(table);
   scheduleBotTurn(table);
   renderNotice();
@@ -1188,7 +1213,7 @@ function renderAuthRoleNotice() {
       `${reservedRole.label} requires user ID "${reservedRole.label}" and password "${reservedRole.password}".`;
   } else if (selectedRole === "guest") {
     els.authNotice.textContent =
-      "Enter a player name, choose whether opponent cards are hidden or shown, then practice against bots.";
+      "Enter a player name, choose visibility, bot behavior, and learning support, then practice against bots.";
   } else {
     els.authNotice.textContent = "Use a 3-24 character user ID and a password of at least 8 characters.";
   }
@@ -1201,6 +1226,11 @@ async function applyAuthProfile() {
   const selectedRole = state.authMode === "guest" ? "guest" : els.authRole.value;
   const guestMode =
     els.guestPracticeOptions.querySelector('input[name="guestMode"]:checked')?.value || "masked";
+  const guestBotStyle =
+    els.guestPracticeOptions.querySelector('input[name="guestBotStyle"]:checked')?.value || "adaptive";
+  const guestLiveLearning = Boolean(
+    els.guestPracticeOptions.querySelector('input[name="guestLiveLearning"]')?.checked,
+  );
 
   if (state.authMode !== "signin" && name.length < 2) {
     els.authNotice.textContent = "Enter a display name with at least 2 characters.";
@@ -1247,7 +1277,7 @@ async function applyAuthProfile() {
     if (state.authMode === "guest") {
       state.table = await apiFetch("/api/poker/tables/guest", {
         method: "POST",
-        body: { mode: guestMode },
+        body: { mode: guestMode, botStyle: guestBotStyle, liveLearningMode: guestLiveLearning },
       });
       resetActionSoundTracking(state.table);
       startTablePolling();
@@ -1338,6 +1368,10 @@ function renderSeat(player, slotIndex, totalSeats, seatNumber) {
   ].join("");
   const cards = player.hole.map(renderCard).join("");
   const position = getSeatPosition(slotIndex, 9);
+  const botStyleChip =
+    player.type === "bot" && player.personality?.label
+      ? `<small class="bot-style-chip" title="${escapeHtml(player.personality.description || "")}">${escapeHtml(player.personality.label)}</small>`
+      : "";
 
   return `
     <article
@@ -1353,6 +1387,7 @@ function renderSeat(player, slotIndex, totalSeats, seatNumber) {
           <span class="seat-player-name">
             ${escapeHtml(player.name)}
             ${player.isYou ? '<small class="you-label">You</small>' : ""}
+            ${botStyleChip}
           </span>
         </span>
         <span class="seat-badges">${badges}</span>
@@ -1373,19 +1408,29 @@ function renderSeat(player, slotIndex, totalSeats, seatNumber) {
   `;
 }
 
-function renderOpenSeat(slotIndex, seatNumber) {
+function renderOpenSeat(slotIndex, seatNumber, canClaim = false) {
   const position = getSeatPosition(slotIndex, 9);
+  const tagName = canClaim ? "button" : "div";
+  const typeAttribute = canClaim ? ' type="button"' : "";
+  const claimAttribute = canClaim ? ` data-open-seat-number="${seatNumber}"` : "";
+  const disabledAttribute = canClaim && state.seatClaimBusy ? " disabled" : "";
+  const className = canClaim ? "open-seat is-clickable" : "open-seat";
+  const label = canClaim ? "Pick seat" : "Open";
+
   return `
-    <div
-      class="open-seat"
+    <${tagName}
+      class="${className}"
       data-seat-index="${slotIndex}"
       data-table-seat="${seatNumber}"
+      ${claimAttribute}
       style="--seat-x: ${position.x}%; --seat-y: ${position.y}%;"
-      aria-label="Seat ${seatNumber} open"
+      aria-label="Seat ${seatNumber} ${label.toLowerCase()}"
+      ${typeAttribute}
+      ${disabledAttribute}
     >
       <strong>Seat ${seatNumber}</strong>
-      <span>Open</span>
-    </div>
+      <span>${label}</span>
+    </${tagName}>
   `;
 }
 
@@ -1573,6 +1618,20 @@ function renderControls(table, human) {
   els.callButton.textContent = legal.callAmount > 0 ? `Call ${chips(legal.callAmount)}` : "Call";
   renderAmountActionLabels(table);
   els.nextHandButton.classList.toggle("is-hidden", table.status === "playing" || !table.isHost);
+}
+
+function renderLearningCoach(table) {
+  const coach = table.learningCoach;
+  const visible = table.viewerMode === "player" && coach?.enabled;
+  els.learningCoachPanel.classList.toggle("is-hidden", !visible);
+  if (!visible) return;
+
+  els.learningCoachBadge.textContent = coach.badge || "Table coach";
+  els.learningCoachTitle.textContent = coach.title || "Live Learning Mode";
+  els.learningCoachRecommendation.textContent = coach.recommendation || "";
+  els.learningCoachTips.innerHTML = (coach.tips || [])
+    .map((tip) => `<li>${escapeHtml(tip)}</li>`)
+    .join("");
 }
 
 function sendIncreaseAction() {

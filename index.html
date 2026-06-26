@@ -136,17 +136,52 @@
                 </div>
               </section>
               <fieldset class="guest-practice-options is-hidden" id="guestPracticeOptions">
-                <legend>Practice visibility</legend>
-                <div class="segmented mode-toggle">
-                  <label>
-                    <input type="radio" name="guestMode" value="masked" checked />
-                    <span>Masked <small>Hide opponents</small></span>
-                  </label>
-                  <label>
-                    <input type="radio" name="guestMode" value="unmasked" />
-                    <span>Unmasked <small>Show opponents</small></span>
-                  </label>
+                <legend>Practice setup</legend>
+                <div class="practice-option-group">
+                  <strong>Card visibility</strong>
+                  <div class="segmented mode-toggle">
+                    <label>
+                      <input type="radio" name="guestMode" value="masked" checked />
+                      <span>Masked <small>Hide opponents</small></span>
+                    </label>
+                    <label>
+                      <input type="radio" name="guestMode" value="unmasked" />
+                      <span>Unmasked <small>Show opponents</small></span>
+                    </label>
+                  </div>
                 </div>
+                <div class="practice-option-group">
+                  <strong>Bot behavior</strong>
+                  <div class="segmented bot-style-toggle">
+                    <label>
+                      <input type="radio" name="guestBotStyle" value="adaptive" checked />
+                      <span>Adaptive <small>Learns you</small></span>
+                    </label>
+                    <label>
+                      <input type="radio" name="guestBotStyle" value="balanced" />
+                      <span>Balanced <small>Mixed lines</small></span>
+                    </label>
+                    <label>
+                      <input type="radio" name="guestBotStyle" value="tight" />
+                      <span>Tight <small>Patient</small></span>
+                    </label>
+                    <label>
+                      <input type="radio" name="guestBotStyle" value="aggressive" />
+                      <span>Aggressive <small>Pressure</small></span>
+                    </label>
+                    <label>
+                      <input type="radio" name="guestBotStyle" value="calling-station" />
+                      <span>Calling <small>Sticky</small></span>
+                    </label>
+                  </div>
+                </div>
+                <label class="practice-learning-toggle">
+                  <input type="checkbox" name="guestLiveLearning" checked />
+                  <span>
+                    <strong>Live Learning Mode</strong>
+                    <small>Show hand strength, pot odds, and decision tips while practicing.</small>
+                  </span>
+                </label>
               </fieldset>
               <button class="primary-action" id="authSubmitButton" type="button">Continue as Player</button>
               <p class="notice" id="authNotice" role="status"></p>
@@ -489,6 +524,18 @@
               </div>
               <p class="notice" id="actionNotice" role="status"></p>
             </div>
+          </section>
+
+          <section class="learning-coach is-hidden" id="learningCoachPanel" aria-label="Live Learning Mode">
+            <div class="learning-coach-head">
+              <div>
+                <span class="eyebrow" id="learningCoachBadge">Decision coach</span>
+                <strong id="learningCoachTitle">Live Learning Mode</strong>
+              </div>
+              <span class="learning-live-pill">Live</span>
+            </div>
+            <p id="learningCoachRecommendation"></p>
+            <ul id="learningCoachTips"></ul>
           </section>
 
           <section class="viewer-console is-hidden" id="viewerConsole" aria-label="View-only room access">

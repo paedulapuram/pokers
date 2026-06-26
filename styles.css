@@ -641,6 +641,58 @@ select {
   background: rgba(228, 182, 79, 0.07);
 }
 
+.practice-option-group {
+  display: grid;
+  gap: 7px;
+}
+
+.practice-option-group > strong {
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.bot-style-toggle {
+  grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
+}
+
+.practice-learning-toggle {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid rgba(63, 124, 166, 0.46);
+  border-radius: 8px;
+  background: rgba(63, 124, 166, 0.1);
+  cursor: pointer;
+}
+
+.practice-learning-toggle input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--gold);
+}
+
+.practice-learning-toggle span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.practice-learning-toggle strong {
+  color: var(--ink);
+  font-size: 0.9rem;
+}
+
+.practice-learning-toggle small {
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 750;
+  line-height: 1.35;
+}
+
 .photo-field {
   display: grid;
   gap: 8px;
@@ -1758,6 +1810,22 @@ select {
   text-transform: uppercase;
 }
 
+.bot-style-chip {
+  display: inline-grid;
+  place-items: center;
+  max-width: 100%;
+  margin-left: 5px;
+  padding: 2px 5px;
+  border: 1px solid rgba(228, 182, 79, 0.35);
+  border-radius: 999px;
+  color: var(--gold);
+  background: rgba(228, 182, 79, 0.1);
+  font-size: 0.58rem;
+  font-weight: 900;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
 .seat-badges {
   display: flex;
   flex-wrap: wrap;
@@ -1808,6 +1876,8 @@ select {
     0 0 0 4px rgba(23, 14, 11, 0.78),
     0 6px 14px rgba(0, 0, 0, 0.32);
   font-size: 0.68rem;
+  font-family: inherit;
+  font-weight: 900;
   line-height: 1.05;
   text-align: center;
   text-transform: uppercase;
@@ -1815,9 +1885,41 @@ select {
   pointer-events: none;
 }
 
+.open-seat.is-clickable {
+  border-color: rgba(228, 182, 79, 0.86);
+  background:
+    radial-gradient(circle at 50% 30%, rgba(255, 255, 255, 0.18), transparent 48%),
+    rgba(228, 182, 79, 0.16);
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.open-seat.is-clickable:hover,
+.open-seat.is-clickable:focus-visible {
+  color: #17130d;
+  background: var(--gold);
+  box-shadow:
+    0 0 0 4px rgba(23, 14, 11, 0.78),
+    0 0 0 7px rgba(228, 182, 79, 0.22),
+    0 12px 24px rgba(0, 0, 0, 0.34);
+  outline: none;
+}
+
+.open-seat.is-clickable:disabled {
+  cursor: wait;
+  opacity: 0.66;
+}
+
 .open-seat strong {
   color: var(--gold);
   font-size: 0.72rem;
+}
+
+.open-seat.is-clickable:hover strong,
+.open-seat.is-clickable:focus-visible strong,
+.open-seat.is-clickable:hover span,
+.open-seat.is-clickable:focus-visible span {
+  color: #17130d;
 }
 
 .open-seat span {
@@ -2218,6 +2320,70 @@ select {
   background: var(--line);
 }
 
+.learning-coach {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border-top: 1px solid rgba(63, 124, 166, 0.48);
+  background:
+    linear-gradient(90deg, rgba(63, 124, 166, 0.18), transparent 52%),
+    #111820;
+}
+
+.learning-coach-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.learning-coach-head strong {
+  color: var(--ink);
+  font-size: 1rem;
+}
+
+.learning-live-pill {
+  display: inline-grid;
+  place-items: center;
+  min-width: 48px;
+  min-height: 26px;
+  padding: 0 10px;
+  border: 1px solid rgba(79, 190, 126, 0.58);
+  border-radius: 999px;
+  color: #dfffe9;
+  background: rgba(79, 190, 126, 0.18);
+  font-size: 0.72rem;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.learning-coach p {
+  color: var(--ink);
+  font-weight: 850;
+  line-height: 1.45;
+}
+
+.learning-coach ul {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.learning-coach li {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.045);
+  font-size: 0.82rem;
+  font-weight: 750;
+  line-height: 1.4;
+}
+
 .viewer-console {
   display: flex;
   align-items: center;
@@ -2467,6 +2633,10 @@ input[type="range"] {
 
   .felt-layout {
     min-height: auto;
+  }
+
+  .learning-coach ul {
+    grid-template-columns: 1fr;
   }
 }
 

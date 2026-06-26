@@ -46,6 +46,83 @@ const HAND_LABELS = [
 
 const BOT_NAMES = ["Mira", "Dev", "Asha", "Noor", "Kai", "Ira", "Zed", "Lina"];
 const TABLE_MODES = ["masked", "unmasked"];
+const BOT_PERSONALITIES = Object.freeze({
+  adaptive: {
+    label: "Adaptive",
+    description: "Reads the practice session and changes pressure.",
+    allInCallStrength: 0.55,
+    allInCallRollAbove: 0.7,
+    raiseStrength: 0.82,
+    raiseRollAbove: 0.25,
+    foldStrength: 0.35,
+    pressureFold: 0.18,
+    foldRollBelow: 0.72,
+    betStrength: 0.76,
+    betRollAbove: 0.35,
+    betPotRatio: 0.55,
+    bluffChance: 0.02,
+  },
+  balanced: {
+    label: "Balanced",
+    description: "Mixes calls, folds, value bets, and light bluffs.",
+    allInCallStrength: 0.55,
+    allInCallRollAbove: 0.7,
+    raiseStrength: 0.82,
+    raiseRollAbove: 0.25,
+    foldStrength: 0.35,
+    pressureFold: 0.18,
+    foldRollBelow: 0.72,
+    betStrength: 0.76,
+    betRollAbove: 0.35,
+    betPotRatio: 0.55,
+    bluffChance: 0.02,
+  },
+  tight: {
+    label: "Tight",
+    description: "Folds more often and attacks mostly with strong hands.",
+    allInCallStrength: 0.68,
+    allInCallRollAbove: 0.84,
+    raiseStrength: 0.88,
+    raiseRollAbove: 0.35,
+    foldStrength: 0.48,
+    pressureFold: 0.1,
+    foldRollBelow: 0.86,
+    betStrength: 0.84,
+    betRollAbove: 0.45,
+    betPotRatio: 0.48,
+    bluffChance: 0.01,
+  },
+  aggressive: {
+    label: "Aggressive",
+    description: "Bets and raises wider to pressure the player.",
+    allInCallStrength: 0.48,
+    allInCallRollAbove: 0.52,
+    raiseStrength: 0.68,
+    raiseRollAbove: 0.16,
+    foldStrength: 0.25,
+    pressureFold: 0.34,
+    foldRollBelow: 0.45,
+    betStrength: 0.62,
+    betRollAbove: 0.18,
+    betPotRatio: 0.78,
+    bluffChance: 0.12,
+  },
+  "calling-station": {
+    label: "Calling",
+    description: "Calls wider, folds less, and rarely raises without value.",
+    allInCallStrength: 0.42,
+    allInCallRollAbove: 0.45,
+    raiseStrength: 0.92,
+    raiseRollAbove: 0.65,
+    foldStrength: 0.18,
+    pressureFold: 0.45,
+    foldRollBelow: 0.22,
+    betStrength: 0.88,
+    betRollAbove: 0.65,
+    betPotRatio: 0.4,
+    bluffChance: 0.03,
+  },
+});
 const TEST_ROLE_PASSWORD = process.env.POKER_ROLE_PASSWORD || "poker-test";
 
 function createPokerTable(options = {}, rng = Math.random) {
@@ -58,6 +135,8 @@ function createPokerTable(options = {}, rng = Math.random) {
   const requestedRole = normalizeRole(options.userRole, "player");
   const userRole = requestedRole === "guest" ? "player" : requestedRole;
   const mode = normalizeTableMode(options.mode || options.visibilityMode || options.cardMode);
+  const botStyle = normalizeBotStyle(options.botStyle || options.practiceBotStyle);
+  const liveLearningMode = Boolean(options.liveLearningMode || options.learningMode);
   const hostAsSpectator = Boolean(options.hostAsSpectator);
   const fillWithBots = options.fillWithBots !== false;
 
@@ -82,7 +161,10 @@ function createPokerTable(options = {}, rng = Math.random) {
       gameType,
       mode,
       chipMode: "virtual-chips",
+      botStyle,
+      liveLearningMode,
     },
+    botTraining: createBotTrainingState(botStyle),
     tournament:
       gameType === "tournament"
         ? {
@@ -149,6 +231,7 @@ function createPokerTable(options = {}, rng = Math.random) {
         platformRole: "player",
         stack: fillWithBots ? startingStack : 0,
         seat: index + 1,
+        personality: fillWithBots ? botStyle : null,
       }),
     );
   }
@@ -219,7 +302,7 @@ function joinPokerTable(table, options = {}) {
   return openSeat;
 }
 
-function createPlayer({ id, name, profileImage, type, platformRole, stack, seat }) {
+function createPlayer({ id, name, profileImage, type, platformRole, stack, seat, personality }) {
   return {
     id,
     name,
@@ -237,6 +320,7 @@ function createPlayer({ id, name, profileImage, type, platformRole, stack, seat 
     acted: false,
     lastAction: "",
     handRank: null,
+    personality: type === "bot" ? normalizeBotStyle(personality) : null,
   };
 }
 
@@ -367,6 +451,7 @@ function applyAction(table, actionPayload = {}, rng = Math.random) {
     player.acted = true;
     player.lastAction = "Fold";
     table.events.push(`${player.name} folded.`);
+    recordBotTrainingAction(table, player, "fold");
     settleAfterAction(table, rng);
     return table;
   }
@@ -378,6 +463,7 @@ function applyAction(table, actionPayload = {}, rng = Math.random) {
     player.acted = true;
     player.lastAction = "Check";
     table.events.push(`${player.name} checked.`);
+    recordBotTrainingAction(table, player, "check");
     settleAfterAction(table, rng);
     return table;
   }
@@ -387,11 +473,13 @@ function applyAction(table, actionPayload = {}, rng = Math.random) {
       player.acted = true;
       player.lastAction = "Check";
       table.events.push(`${player.name} checked.`);
+      recordBotTrainingAction(table, player, "check");
     } else {
       const committed = commitChips(player, callAmount);
       player.acted = true;
       player.lastAction = player.allIn && committed < callAmount ? `All in ${committed}` : `Call ${committed}`;
       table.events.push(`${player.name} called ${committed}.`);
+      recordBotTrainingAction(table, player, "call");
     }
     settleAfterAction(table, rng);
     return table;
@@ -417,6 +505,7 @@ function applyAction(table, actionPayload = {}, rng = Math.random) {
     player.acted = true;
     player.lastAction = player.allIn ? `All in ${player.bet}` : `Bet ${player.bet}`;
     table.events.push(`${player.name} bet ${player.bet}.`);
+    recordBotTrainingAction(table, player, "bet");
     settleAfterAction(table, rng);
     return table;
   }
@@ -445,6 +534,7 @@ function applyAction(table, actionPayload = {}, rng = Math.random) {
     player.acted = true;
     player.lastAction = player.allIn ? `All in ${player.bet}` : `Raise to ${player.bet}`;
     table.events.push(`${player.name} raised to ${player.bet}.`);
+    recordBotTrainingAction(table, player, "raise");
     settleAfterAction(table, rng);
     return table;
   }
@@ -462,6 +552,7 @@ function applyAction(table, actionPayload = {}, rng = Math.random) {
     player.acted = true;
     player.lastAction = `All in ${committed}`;
     table.events.push(`${player.name} moved all in for ${committed}.`);
+    recordBotTrainingAction(table, player, "all-in");
     settleAfterAction(table, rng);
     return table;
   }
@@ -535,31 +626,43 @@ function advanceStreet(table, rng) {
   }
 }
 
-function chooseBotAction(table, bot, rng) {
+function chooseBotAction(table, bot, rng = Math.random) {
   const legal = getLegalActions(table, table.currentPlayerIndex);
   const strength = estimateStrength(bot, table.community);
   const pressure = legal.callAmount / Math.max(1, bot.stack + bot.bet);
+  const personality = resolveBotPersonality(table, bot);
   const roll = rng();
 
   if (legal.callAmount > 0) {
     if (legal.callAmount >= bot.stack) {
-      return strength > 0.55 || roll > 0.7 ? { action: "call" } : { action: "fold" };
+      return strength > personality.allInCallStrength || roll > personality.allInCallRollAbove
+        ? { action: "call" }
+        : { action: "fold" };
     }
 
-    if (strength > 0.82 && legal.canRaise && roll > 0.25) {
+    if (strength > personality.raiseStrength && legal.canRaise && roll > personality.raiseRollAbove) {
       return { action: "raise", amount: Math.min(legal.maxBet, legal.minRaiseTo) };
     }
 
-    if (strength < 0.35 && pressure > 0.18 && roll < 0.72) {
+    if (
+      strength < personality.foldStrength &&
+      pressure > personality.pressureFold &&
+      roll < personality.foldRollBelow
+    ) {
       return { action: "fold" };
     }
 
     return { action: "call" };
   }
 
-  if (strength > 0.76 && legal.canBet && roll > 0.35) {
-    const target = Math.min(legal.maxBet, Math.max(legal.minBet, Math.floor(totalPot(table) * 0.55)));
+  if (strength > personality.betStrength && legal.canBet && roll > personality.betRollAbove) {
+    const potTarget = Math.floor(Math.max(totalPot(table), table.config.bigBlind) * personality.betPotRatio);
+    const target = Math.min(legal.maxBet, Math.max(legal.minBet, potTarget));
     return { action: "bet", amount: target };
+  }
+
+  if (legal.canBet && roll < personality.bluffChance) {
+    return { action: "bet", amount: Math.min(legal.maxBet, legal.minBet) };
   }
 
   return { action: "check" };
@@ -595,6 +698,119 @@ function estimateStrength(player, community) {
   }
 
   return Math.min(0.94, score);
+}
+
+function createBotTrainingState(botStyle) {
+  const selectedStyle = normalizeBotStyle(botStyle);
+  return {
+    enabled: selectedStyle === "adaptive",
+    selectedStyle,
+    currentStyle: "balanced",
+    read: selectedStyle === "adaptive" ? "Collecting your tendencies." : "",
+    counts: {
+      actions: 0,
+      folds: 0,
+      calls: 0,
+      checks: 0,
+      bets: 0,
+      raises: 0,
+      allIns: 0,
+    },
+  };
+}
+
+function recordBotTrainingAction(table, player, action) {
+  if (!table.botTraining?.enabled || player.type !== "human") {
+    return;
+  }
+
+  const counts = table.botTraining.counts;
+  counts.actions += 1;
+
+  if (action === "fold") counts.folds += 1;
+  if (action === "call") counts.calls += 1;
+  if (action === "check") counts.checks += 1;
+  if (action === "bet") counts.bets += 1;
+  if (action === "raise") counts.raises += 1;
+  if (action === "all-in") counts.allIns += 1;
+
+  const previousStyle = table.botTraining.currentStyle;
+  const nextStyle = getAdaptiveCounterStyle(table.botTraining);
+  table.botTraining.currentStyle = nextStyle;
+  table.botTraining.read = describeAdaptiveRead(table.botTraining, nextStyle);
+
+  if (previousStyle !== nextStyle && counts.actions >= 3) {
+    table.events.push(`Adaptive bots shifted to ${BOT_PERSONALITIES[nextStyle].label.toLowerCase()} pressure.`);
+  }
+}
+
+function getAdaptiveCounterStyle(training) {
+  const counts = training?.counts || {};
+  const actions = Math.max(0, Number(counts.actions) || 0);
+
+  if (actions < 3) {
+    return "balanced";
+  }
+
+  const aggressionRate = ((counts.bets || 0) + (counts.raises || 0) + (counts.allIns || 0)) / actions;
+  const foldRate = (counts.folds || 0) / actions;
+  const passiveRate = ((counts.calls || 0) + (counts.checks || 0)) / actions;
+  const callRate = (counts.calls || 0) / actions;
+
+  if (foldRate >= 0.42) {
+    return "aggressive";
+  }
+  if (aggressionRate >= 0.38) {
+    return "tight";
+  }
+  if (passiveRate >= 0.68) {
+    return "aggressive";
+  }
+  if (callRate >= 0.42 && aggressionRate < 0.22) {
+    return "tight";
+  }
+  return "balanced";
+}
+
+function describeAdaptiveRead(training, style) {
+  const actions = training?.counts?.actions || 0;
+  if (actions < 3) {
+    return "Collecting your tendencies.";
+  }
+  if (style === "aggressive") {
+    return "You are giving up or playing passively, so bots are applying pressure.";
+  }
+  if (style === "tight") {
+    return "You are attacking or calling often, so bots are waiting for stronger spots.";
+  }
+  return "Your decisions look balanced, so bots are mixing their lines.";
+}
+
+function resolveBotPersonality(table, bot = {}) {
+  const selectedStyle = normalizeBotStyle(bot.personality || table.config?.botStyle);
+  const effectiveStyle =
+    selectedStyle === "adaptive"
+      ? getAdaptiveCounterStyle(table.botTraining)
+      : selectedStyle;
+  const details = getBotPersonalityDetails(effectiveStyle);
+
+  if (selectedStyle === "adaptive" && table.botTraining) {
+    table.botTraining.currentStyle = effectiveStyle;
+    table.botTraining.read = describeAdaptiveRead(table.botTraining, effectiveStyle);
+    return {
+      ...details,
+      selectedStyle,
+      effectiveStyle,
+      label: `Adaptive: ${details.label}`,
+      description: table.botTraining.read,
+    };
+  }
+
+  return {
+    ...details,
+    selectedStyle,
+    effectiveStyle,
+  };
 }
 
 function postBlind(table, playerIndex, amount, label) {
@@ -926,6 +1142,98 @@ function estimateHumanChanceAgainstUnknown(table, human, contenderCount) {
   return clamp(Math.round((baseline + centeredStrength) * 100), 1, 99);
 }
 
+function buildLiveLearningCoach(table, options = {}) {
+  if (!table.config?.liveLearningMode || !options.human) {
+    return null;
+  }
+
+  const human = options.human;
+  const legal = options.legalActions || getLegalActions(table, table.currentPlayerIndex);
+  const winChance = options.winChance || createWinChance(null, "hidden");
+  const strength = estimateStrength(human, table.community);
+  const activeBotPersonalities = new Set(
+    table.players
+      .filter((player) => player.type === "bot")
+      .map((player) => serializeBotPersonality(table, player).label),
+  );
+  const callAmount = legal.callAmount || amountToCall(table, human);
+  const potTotal = totalPot(table);
+  const potOdds = callAmount > 0 ? Math.round((callAmount / Math.max(1, potTotal + callAmount)) * 100) : 0;
+  const tips = [
+    `Hand read: ${describeHandStrength(strength)} for ${table.phase}.`,
+    callAmount > 0
+      ? `Pot odds: call ${callAmount} to chase a pot of ${potTotal}; you need about ${potOdds}% equity.`
+      : "No bet to call right now, so checking controls the pot and betting applies pressure.",
+  ];
+
+  if (winChance.percent != null) {
+    tips.push(`Current win chance estimate is ${winChance.percent}%.`);
+  } else if (table.mode === "masked") {
+    tips.push("Masked mode hides opponent cards, so treat win chance as an estimate rather than a full read.");
+  }
+
+  if (table.botTraining?.enabled) {
+    tips.push(table.botTraining.read || "Adaptive bots are collecting your tendencies.");
+  } else if (activeBotPersonalities.size) {
+    tips.push(`Bot table style: ${Array.from(activeBotPersonalities).join(", ")}.`);
+  }
+
+  return {
+    enabled: true,
+    title: "Live Learning Mode",
+    badge: options.isViewerTurn ? "Decision coach" : "Table coach",
+    recommendation: buildLearningRecommendation(table, human, legal, strength, winChance, potOdds),
+    tips,
+  };
+}
+
+function describeHandStrength(strength) {
+  if (strength >= 0.78) return "strong";
+  if (strength >= 0.58) return "playable";
+  if (strength >= 0.42) return "speculative";
+  return "weak";
+}
+
+function buildLearningRecommendation(table, human, legal, strength, winChance, potOdds) {
+  if (table.status === "hand-complete") {
+    const wonHand = table.winners.some((winner) => winner.playerId === human.id);
+    return wonHand
+      ? "Review why this hand won before the next hand starts."
+      : "Review the showdown and note whether the losing decision was preflop, flop, turn, or river.";
+  }
+
+  if (!legal.canFold && !legal.canCheck && !legal.canCall && !legal.canBet && !legal.canRaise) {
+    const currentPlayer = table.players[table.currentPlayerIndex];
+    return currentPlayer?.type === "bot"
+      ? `Watch ${currentPlayer.name}'s action and compare it with the pot size.`
+      : "Watch the action and prepare your next decision.";
+  }
+
+  if (legal.callAmount > 0) {
+    if (winChance.percent != null && winChance.percent >= potOdds + 10) {
+      return "Calling is reasonable because your estimated equity is above the price of the call.";
+    }
+    if (strength >= 0.72 && legal.canRaise) {
+      return "Raising can build value with a strong hand, especially against calling bots.";
+    }
+    if (strength < 0.42 && legal.callAmount > table.config.bigBlind) {
+      return "Folding is reasonable when a weak hand faces meaningful pressure.";
+    }
+    return "Calling keeps you in the hand; folding protects chips if the story does not make sense.";
+  }
+
+  if (strength >= 0.74 && (legal.canBet || legal.canRaise)) {
+    return "Consider betting for value because your hand is ahead often enough to charge weaker hands.";
+  }
+  if (strength <= 0.4 && legal.canCheck) {
+    return "Checking is a low-risk choice with a weak or uncertain hand.";
+  }
+  if (legal.canBet) {
+    return "A small bet can win the pot now, but checking keeps the pot controlled.";
+  }
+  return "Choose the action that fits your hand strength, position, and pot odds.";
+}
+
 function remainingDeckCards(table) {
   const knownCardIds = new Set();
   for (const card of table.community) {
@@ -1039,6 +1347,7 @@ function serializePokerTable(table, options = {}) {
     currentPlayer?.type === "human" &&
     (!viewerPlayerId || currentPlayer.id === viewerPlayerId);
   const viewer = viewerPlayerId ? table.players.find((player) => player.id === viewerPlayerId) : null;
+  const legalActions = getLegalActions(table, isViewerTurn ? table.currentPlayerIndex : -1);
 
   return {
     id: table.id,
@@ -1054,7 +1363,16 @@ function serializePokerTable(table, options = {}) {
       ...table.config,
       mode,
       chipMode: table.config?.chipMode || table.chipMode || "virtual-chips",
+      botStyle: normalizeBotStyle(table.config?.botStyle),
+      liveLearningMode: Boolean(table.config?.liveLearningMode),
     },
+    botTraining: serializeBotTraining(table),
+    learningCoach: buildLiveLearningCoach(table, {
+      human: viewer,
+      isViewerTurn,
+      legalActions,
+      winChance: viewer ? winChances.get(viewer.id) : null,
+    }),
     tournament,
     roles: {
       ...table.roles,
@@ -1083,7 +1401,7 @@ function serializePokerTable(table, options = {}) {
     pot: table.pot,
     potTotal: totalPot(table),
     currentBet: table.currentBet,
-    legalActions: getLegalActions(table, isViewerTurn ? table.currentPlayerIndex : -1),
+    legalActions,
     players: table.players.map((player, index) => ({
       id: player.id,
       name: player.name,
@@ -1091,6 +1409,7 @@ function serializePokerTable(table, options = {}) {
       type: player.type,
       platformRole: player.platformRole,
       actorRole: player.actorRole,
+      personality: player.type === "bot" ? serializeBotPersonality(table, player) : null,
       seat: player.seat,
       stack: player.stack,
       bet: player.bet,
@@ -1123,6 +1442,42 @@ function serializePokerTable(table, options = {}) {
     showdown: table.showdown,
     message: isViewerTurn ? "Your turn. Choose a table action." : table.message,
     events: table.events.slice(-12),
+  };
+}
+
+function serializeBotTraining(table) {
+  if (!table.botTraining) {
+    return null;
+  }
+  if (table.botTraining.enabled) {
+    table.botTraining.currentStyle = getAdaptiveCounterStyle(table.botTraining);
+    table.botTraining.read = describeAdaptiveRead(table.botTraining, table.botTraining.currentStyle);
+  }
+
+  return {
+    enabled: Boolean(table.botTraining.enabled),
+    selectedStyle: normalizeBotStyle(table.botTraining.selectedStyle),
+    currentStyle: normalizeBotStyle(table.botTraining.currentStyle),
+    read: table.botTraining.read || "",
+    actions: table.botTraining.counts?.actions || 0,
+    counts: {
+      folds: table.botTraining.counts?.folds || 0,
+      calls: table.botTraining.counts?.calls || 0,
+      checks: table.botTraining.counts?.checks || 0,
+      bets: table.botTraining.counts?.bets || 0,
+      raises: table.botTraining.counts?.raises || 0,
+      allIns: table.botTraining.counts?.allIns || 0,
+    },
+  };
+}
+
+function serializeBotPersonality(table, player) {
+  const details = resolveBotPersonality(table, player);
+  return {
+    style: details.selectedStyle,
+    effectiveStyle: details.effectiveStyle,
+    label: details.label,
+    description: details.description,
   };
 }
 
@@ -1418,6 +1773,19 @@ function normalizeTableMode(value) {
   return TABLE_MODES.includes(mode) ? mode : "masked";
 }
 
+function normalizeBotStyle(value) {
+  const style = String(value || "balanced").trim().toLowerCase();
+  return Object.prototype.hasOwnProperty.call(BOT_PERSONALITIES, style) ? style : "balanced";
+}
+
+function getBotPersonalityDetails(value) {
+  const style = normalizeBotStyle(value);
+  return {
+    style,
+    ...BOT_PERSONALITIES[style],
+  };
+}
+
 function requiresRolePassword(role) {
   return role === "host" || role === "admin";
 }
@@ -1437,6 +1805,7 @@ function createPokerError(status, message) {
 }
 
 module.exports = {
+  BOT_PERSONALITIES,
   buildDeck,
   shuffle,
   createCard,
@@ -1448,7 +1817,9 @@ module.exports = {
   performPokerAction,
   performNextPokerBotAction,
   playPokerBots,
+  chooseBotAction,
   serializePokerTable,
+  getBotPersonalityDetails,
   getLegalActions,
   evaluateBestHand,
   compareRanks,

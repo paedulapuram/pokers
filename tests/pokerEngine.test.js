@@ -6,10 +6,12 @@ const assert = require("node:assert/strict");
 const {
   buildDeck,
   buildTournamentBlindSchedule,
+  chooseBotAction,
   compareRanks,
   createCard,
   createPokerTable,
   evaluateBestHand,
+  getBotPersonalityDetails,
   joinPokerTable,
   performNextPokerBotAction,
   performPokerAction,
@@ -272,6 +274,123 @@ test("unmasked poker mode reveals opponent hole cards during betting", () => {
     serialized.players.reduce((sum, player) => sum + player.winChance.percent, 0),
     100,
   );
+});
+
+test("guest practice tables expose selected bot personality details", () => {
+  const table = createPokerTable({
+    playerName: "Alex",
+    botStyle: "adaptive",
+    seatCount: 2,
+    smallBlind: 10,
+    bigBlind: 20,
+    startingStack: 1000,
+  });
+  const serialized = serializePokerTable(table);
+  const bot = serialized.players.find((player) => player.type === "bot");
+
+  assert.equal(serialized.config.botStyle, "adaptive");
+  assert.equal(serialized.botTraining.enabled, true);
+  assert.equal(bot.personality.style, "adaptive");
+  assert.equal(bot.personality.effectiveStyle, "balanced");
+  assert.match(bot.personality.label, /Adaptive/);
+  assert.equal(getBotPersonalityDetails("aggressive").label, "Aggressive");
+});
+
+test("bot personalities make different decisions under pressure", () => {
+  const createDecisionTable = (personality) => {
+    const bot = {
+      id: `bot-${personality}`,
+      name: "Bot",
+      type: "bot",
+      personality,
+      stack: 1000,
+      bet: 0,
+      folded: false,
+      allIn: false,
+      hole: [createCard("2", "C"), createCard("7", "D")],
+    };
+
+    return {
+      status: "playing",
+      phase: "preflop",
+      config: { bigBlind: 20, botStyle: personality },
+      currentPlayerIndex: 0,
+      currentBet: 200,
+      minRaise: 200,
+      pot: 300,
+      community: [],
+      players: [bot],
+    };
+  };
+
+  const tightTable = createDecisionTable("tight");
+  const callingTable = createDecisionTable("calling-station");
+
+  assert.deepEqual(chooseBotAction(tightTable, tightTable.players[0], () => 0.2), { action: "fold" });
+  assert.deepEqual(chooseBotAction(callingTable, callingTable.players[0], () => 0.2), { action: "call" });
+});
+
+test("adaptive bots adjust style from observed player actions", () => {
+  const table = createPokerTable({
+    playerName: "Alex",
+    botStyle: "adaptive",
+    seatCount: 2,
+    smallBlind: 10,
+    bigBlind: 20,
+    startingStack: 1000,
+  });
+
+  table.botTraining.counts = {
+    actions: 5,
+    folds: 4,
+    calls: 0,
+    checks: 1,
+    bets: 0,
+    raises: 0,
+    allIns: 0,
+  };
+
+  const serialized = serializePokerTable(table);
+  const bot = serialized.players.find((player) => player.type === "bot");
+
+  assert.equal(serialized.botTraining.currentStyle, "aggressive");
+  assert.equal(bot.personality.effectiveStyle, "aggressive");
+  assert.match(bot.personality.description, /pressure/);
+});
+
+test("live learning mode adds guest practice coaching advice", () => {
+  const table = createPokerTable({
+    playerId: "guest-player",
+    playerName: "Alex",
+    botStyle: "adaptive",
+    liveLearningMode: true,
+    seatCount: 2,
+    smallBlind: 10,
+    bigBlind: 20,
+    startingStack: 1000,
+  });
+  const serialized = serializePokerTable(table, { viewerPlayerId: "guest-player" });
+
+  assert.equal(serialized.config.liveLearningMode, true);
+  assert.equal(serialized.learningCoach.enabled, true);
+  assert.equal(serialized.learningCoach.title, "Live Learning Mode");
+  assert.equal(serialized.learningCoach.tips.some((tip) => /Hand read/.test(tip)), true);
+  assert.equal(serialized.learningCoach.recommendation.length > 0, true);
+});
+
+test("live learning mode stays off unless explicitly enabled", () => {
+  const table = createPokerTable({
+    playerId: "guest-player",
+    playerName: "Alex",
+    seatCount: 2,
+    smallBlind: 10,
+    bigBlind: 20,
+    startingStack: 1000,
+  });
+  const serialized = serializePokerTable(table, { viewerPlayerId: "guest-player" });
+
+  assert.equal(serialized.config.liveLearningMode, false);
+  assert.equal(serialized.learningCoach, null);
 });
 
 test("performPokerAction pauses on bot turns before continuing", () => {

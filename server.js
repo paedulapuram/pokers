@@ -250,6 +250,8 @@ async function handlePokerApi(req, res, url) {
     requirePermission(session, "practice_with_bots", "Quick play is available for Guest sessions.");
     const body = await readJson(req);
     const practiceMode = body.mode === "unmasked" ? "unmasked" : "masked";
+    const botStyle = String(body.botStyle || "adaptive");
+    const liveLearningMode = body.liveLearningMode === true || body.liveLearningMode === "true";
     const table = createPokerTable({
       playerId: session.playerId,
       playerName: session.playerName,
@@ -260,6 +262,8 @@ async function handlePokerApi(req, res, url) {
       bigBlind: 20,
       startingStack: 1500,
       mode: practiceMode,
+      botStyle,
+      liveLearningMode,
       userRole: "player",
     });
     table.roomCode = makeRoomCode();
