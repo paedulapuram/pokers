@@ -252,6 +252,7 @@ async function handlePokerApi(req, res, url) {
     const practiceMode = body.mode === "unmasked" ? "unmasked" : "masked";
     const botStyle = String(body.botStyle || "adaptive");
     const liveLearningMode = body.liveLearningMode === true || body.liveLearningMode === "true";
+    closePracticeTablesForPlayer(session.playerId);
     const table = createPokerTable({
       playerId: session.playerId,
       playerName: session.playerName,
@@ -264,6 +265,7 @@ async function handlePokerApi(req, res, url) {
       mode: practiceMode,
       botStyle,
       liveLearningMode,
+      isPractice: true,
       userRole: "player",
     });
     table.roomCode = makeRoomCode();
@@ -344,7 +346,7 @@ async function handlePokerApi(req, res, url) {
     const session = getPokerSession(req);
     requirePermission(session, "join_cash_table", "Cash table access is available to Player accounts.");
     const tables = [...pokerTables.values()]
-      .filter((table) => table.config.gameType !== "tournament")
+      .filter((table) => table.config.gameType !== "tournament" && !isPracticeTable(table))
       .map((table) => {
         const seatedPlayers = table.players.filter((player) => player.type === "human").length;
         const waitingPlayers = countWaitingPlayers(table.id);
@@ -746,6 +748,18 @@ function countWaitingPlayers(tableId) {
     }
   }
   return waitingPlayerIds.size;
+}
+
+function isPracticeTable(table) {
+  return Boolean(table?.config?.isPractice);
+}
+
+function closePracticeTablesForPlayer(playerId) {
+  for (const table of pokerTables.values()) {
+    if (table.hostPlayerId === playerId && isPracticeTable(table)) {
+      closePokerTable(table);
+    }
+  }
 }
 
 function closePokerTable(table) {

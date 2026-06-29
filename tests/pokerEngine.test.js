@@ -280,6 +280,7 @@ test("guest practice tables expose selected bot personality details", () => {
   const table = createPokerTable({
     playerName: "Alex",
     botStyle: "adaptive",
+    isPractice: true,
     seatCount: 2,
     smallBlind: 10,
     bigBlind: 20,
@@ -289,6 +290,7 @@ test("guest practice tables expose selected bot personality details", () => {
   const bot = serialized.players.find((player) => player.type === "bot");
 
   assert.equal(serialized.config.botStyle, "adaptive");
+  assert.equal(serialized.config.isPractice, true);
   assert.equal(serialized.botTraining.enabled, true);
   assert.equal(bot.personality.style, "adaptive");
   assert.equal(bot.personality.effectiveStyle, "balanced");

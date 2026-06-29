@@ -940,6 +940,7 @@ function renderTable() {
     table.config.seatCount,
     human?.seat || 1,
   );
+  const visualSeatCount = 9;
 
   els.topbarStats.innerHTML = `<span>${escapeHtml(table.variant)} · ${escapeHtml(titleCase(table.mode))}</span><strong>${escapeHtml(table.status)}</strong>`;
   els.tableTitle.textContent = table.name;
@@ -976,7 +977,7 @@ function renderTable() {
 
   els.playersGrid.innerHTML = [
     ...seatLayout.occupied.map(({ player, slotIndex, seatNumber }) =>
-      renderSeat(player, slotIndex, table.config.seatCount, seatNumber),
+      renderSeat(player, slotIndex, visualSeatCount, seatNumber),
     ),
     ...seatLayout.open.map(({ slotIndex, seatNumber }) =>
       renderOpenSeat(slotIndex, seatNumber, isSeatSelection && table.availableSeats?.includes(seatNumber)),

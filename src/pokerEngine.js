@@ -137,6 +137,7 @@ function createPokerTable(options = {}, rng = Math.random) {
   const mode = normalizeTableMode(options.mode || options.visibilityMode || options.cardMode);
   const botStyle = normalizeBotStyle(options.botStyle || options.practiceBotStyle);
   const liveLearningMode = Boolean(options.liveLearningMode || options.learningMode);
+  const isPractice = Boolean(options.isPractice || options.practiceTable);
   const hostAsSpectator = Boolean(options.hostAsSpectator);
   const fillWithBots = options.fillWithBots !== false;
 
@@ -163,6 +164,7 @@ function createPokerTable(options = {}, rng = Math.random) {
       chipMode: "virtual-chips",
       botStyle,
       liveLearningMode,
+      isPractice,
     },
     botTraining: createBotTrainingState(botStyle),
     tournament:
