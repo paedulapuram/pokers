@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Poker Room</title>
-    <link rel="stylesheet" href="styles.css?v=auto-hand-stats-1" />
+    <link rel="stylesheet" href="styles.css?v=player-actions-3" />
   </head>
   <body>
     <div class="app-shell">
@@ -472,6 +472,16 @@
 
           <section class="felt-layout">
             <div class="table-felt">
+              <div class="table-felt-hud" aria-label="Table status">
+                <div class="felt-status-card">
+                  <span id="feltHandLabel">Hand #--</span>
+                  <strong id="feltStreetLabel">Waiting</strong>
+                </div>
+                <div class="felt-game-card">
+                  <span id="feltBlindLabel">NLH · -- / --</span>
+                  <strong id="feltGameId">Game ID: ------</strong>
+                </div>
+              </div>
               <div class="seats-grid" id="playersGrid"></div>
 
               <div class="board-zone">
@@ -482,6 +492,24 @@
                   <strong id="centerPot">0</strong>
                 </div>
                 <p id="tableMessage">Your turn.</p>
+              </div>
+
+              <div class="table-action-dock" id="actionConsole">
+                <div class="amount-control">
+                  <label for="amountInput">Amount</label>
+                  <input id="amountInput" type="range" min="20" max="1500" step="10" value="40" />
+                  <output id="amountOutput">40</output>
+                </div>
+                <div class="button-grid">
+                  <button id="foldButton" type="button">Fold</button>
+                  <button id="checkButton" type="button">Check</button>
+                  <button id="callButton" type="button">Call</button>
+                  <button id="betButton" type="button">Bet</button>
+                  <button id="raiseButton" type="button">Raise</button>
+                  <button id="allInButton" type="button">All In</button>
+                  <button class="primary-action is-hidden" id="nextHandButton" type="button">Next Hand</button>
+                </div>
+                <p class="notice" id="actionNotice" role="status"></p>
               </div>
             </div>
 
@@ -505,24 +533,6 @@
                 <p class="hand-equity" id="humanWinChance">Win chance --</p>
               </div>
               <div class="hole-row" id="humanCards"></div>
-            </div>
-
-            <div class="action-console">
-              <div class="amount-control">
-                <label for="amountInput">Amount</label>
-                <input id="amountInput" type="range" min="20" max="1500" step="10" value="40" />
-                <output id="amountOutput">40</output>
-              </div>
-              <div class="button-grid">
-                <button id="foldButton" type="button">Fold</button>
-                <button id="checkButton" type="button">Check</button>
-                <button id="callButton" type="button">Call</button>
-                <button id="betButton" type="button">Bet</button>
-                <button id="raiseButton" type="button">Raise</button>
-                <button id="allInButton" type="button">All In</button>
-                <button class="primary-action is-hidden" id="nextHandButton" type="button">Next Hand</button>
-              </div>
-              <p class="notice" id="actionNotice" role="status"></p>
             </div>
           </section>
 
@@ -624,6 +634,6 @@
       </section>
     </div>
 
-    <script src="app.js?v=auto-hand-stats-1"></script>
+    <script src="app.js?v=player-actions-3"></script>
   </body>
 </html>

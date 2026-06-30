@@ -111,6 +111,10 @@ const els = {
   tournamentNotice: document.querySelector("#tournamentNotice"),
   roleGuideTitle: document.querySelector("#roleGuideTitle"),
   leaveButton: document.querySelector("#leaveButton"),
+  feltHandLabel: document.querySelector("#feltHandLabel"),
+  feltStreetLabel: document.querySelector("#feltStreetLabel"),
+  feltBlindLabel: document.querySelector("#feltBlindLabel"),
+  feltGameId: document.querySelector("#feltGameId"),
   playersGrid: document.querySelector("#playersGrid"),
   communityRow: document.querySelector("#communityRow"),
   centerPot: document.querySelector("#centerPot"),
@@ -120,6 +124,7 @@ const els = {
   handStatus: document.querySelector("#handStatus"),
   humanWinChance: document.querySelector("#humanWinChance"),
   humanCards: document.querySelector("#humanCards"),
+  actionConsole: document.querySelector("#actionConsole"),
   learningCoachPanel: document.querySelector("#learningCoachPanel"),
   learningCoachBadge: document.querySelector("#learningCoachBadge"),
   learningCoachTitle: document.querySelector("#learningCoachTitle"),
@@ -948,10 +953,16 @@ function renderTable() {
   els.potTotal.textContent = chips(table.potTotal);
   els.centerPot.textContent = chips(table.potTotal);
   els.phaseLabel.textContent = titleCase(table.phase);
+  const activeBlinds = table.tournament?.currentLevel || table.config || {};
+  els.feltHandLabel.textContent = `Hand #${table.handNumber || "--"}`;
+  els.feltStreetLabel.textContent = titleCase(table.phase || table.status);
+  els.feltBlindLabel.textContent = `NLH · ${chips(activeBlinds.smallBlind || 0)} / ${chips(activeBlinds.bigBlind || 0)}`;
+  els.feltGameId.textContent = `Game ID: ${table.roomCode || table.id || "------"}`;
   els.roleLabel.textContent = table.roles.current?.label || titleCase(table.roles.userRole);
   els.modeLabel.textContent = titleCase(table.mode);
   renderTournamentStatus(table);
   els.playerConsole.classList.toggle("is-hidden", !isPlayer);
+  els.actionConsole.classList.toggle("is-hidden", !isPlayer);
   els.seatPickerConsole.classList.add("is-hidden");
   els.viewerConsole.classList.toggle("is-hidden", !(isSpectator || isWaiting));
   if (isWaiting) {
@@ -983,6 +994,10 @@ function renderTable() {
       renderOpenSeat(slotIndex, seatNumber, isSeatSelection && table.availableSeats?.includes(seatNumber)),
     ),
   ].join("");
+  const ownSeat = els.playersGrid.querySelector(".seat.is-you");
+  if (ownSeat) {
+    ownSeat.appendChild(els.actionConsole);
+  }
   els.communityRow.innerHTML = renderCommunity(table.community);
   els.humanCards.innerHTML = (human?.hole || []).map(renderCard).join("");
   els.eventLog.innerHTML = table.events.map((event) => `<li>${escapeHtml(event)}</li>`).join("");
@@ -1358,11 +1373,11 @@ function renderSeat(player, slotIndex, totalSeats, seatNumber) {
   if (player.isCurrent) classes.push("is-current");
   if (player.isCurrent && player.type === "bot") classes.push("is-thinking");
   if (player.isCurrent && player.isYou) classes.push("is-human-turn");
+  if (player.isYou) classes.push("is-you");
   if (player.folded) classes.push("is-folded");
   const actionState = getSeatActionState(player);
 
-  const badges = [
-    `<span class="badge seat-number">S${seatNumber}</span>`,
+  const roleBadges = [
     player.isDealer ? '<span class="badge">D</span>' : "",
     player.isSmallBlind ? '<span class="badge blue">SB</span>' : "",
     player.isBigBlind ? '<span class="badge blue">BB</span>' : "",
@@ -1382,29 +1397,42 @@ function renderSeat(player, slotIndex, totalSeats, seatNumber) {
       data-seat-count="${totalSeats}"
       style="--seat-x: ${position.x}%; --seat-y: ${position.y}%;"
     >
-      <div class="seat-name">
-        <span class="seat-identity">
-          ${renderAvatarMarkup(player.profileImage, player.name)}
+      <div class="seat-player">
+        <span class="seat-role-strip ${roleBadges ? "" : "is-empty"}" aria-label="Seat role badges">${roleBadges}</span>
+        <div class="seat-identity-pillar">
+          <div class="seat-portrait">
+            ${renderAvatarMarkup(player.profileImage, player.name)}
+          </div>
           <span class="seat-player-name">
             ${escapeHtml(player.name)}
             ${player.isYou ? '<small class="you-label">You</small>' : ""}
             ${botStyleChip}
           </span>
-        </span>
-        <span class="seat-badges">${badges}</span>
+        </div>
+        <div class="seat-hud">
+          <div class="seat-nameplate">
+            <div class="seat-main-info">
+              <div class="seat-title-row">
+                <span class="badge seat-number" aria-label="Seat ${seatNumber}" title="Seat ${seatNumber}">${seatNumber}</span>
+              </div>
+            </div>
+          </div>
+          <div class="seat-meta" aria-label="${escapeHtml(player.name)} seat status">
+            <span class="seat-stack-line"><span class="seat-stack-value" aria-label="Total chips ${chips(player.stack)}"><span class="chip-icon" aria-hidden="true"></span><strong>${chips(player.stack)}</strong></span></span>
+            <span><span class="metric-label">Bet</span><strong>${chips(player.bet)}</strong></span>
+          </div>
+        </div>
       </div>
-      <div class="seat-meta">
-        <span><span class="metric-label">Stack</span><strong>${chips(player.stack)}</strong></span>
-        <span><span class="metric-label">Bet</span><strong>${chips(player.bet)}</strong></span>
-        <span class="seat-win ${player.winChance?.percent == null ? "is-hidden-chance" : ""}">
-          <span class="metric-label">Win</span><strong>${escapeHtml(formatWinChance(player.winChance))}</strong>
+      <div class="seat-outside-row">
+        <span class="seat-win-badge ${player.winChance?.percent == null ? "is-hidden-chance" : ""}">
+          <span>Win</span><strong>${escapeHtml(formatWinChance(player.winChance))}</strong>
+        </span>
+        <span class="seat-action ${escapeHtml(actionState.className)}">
+          <span class="action-dot" aria-hidden="true"></span>
+          <strong>${escapeHtml(actionState.label)}</strong>
         </span>
       </div>
       <div class="seat-cards">${cards}</div>
-      <div class="seat-action ${escapeHtml(actionState.className)}">
-        <span class="action-dot" aria-hidden="true"></span>
-        <strong>${escapeHtml(actionState.label)}</strong>
-      </div>
     </article>
   `;
 }
@@ -1548,14 +1576,14 @@ function getSeatPosition(index, totalSeats) {
     ],
     9: [
       { x: 50, y: 84 },
-      { x: 26, y: 74 },
-      { x: 12, y: 52 },
-      { x: 16, y: 25 },
-      { x: 39, y: 14 },
-      { x: 61, y: 14 },
-      { x: 84, y: 25 },
-      { x: 88, y: 52 },
-      { x: 74, y: 74 },
+      { x: 27, y: 77 },
+      { x: 10, y: 56 },
+      { x: 12, y: 31 },
+      { x: 34, y: 19 },
+      { x: 66, y: 19 },
+      { x: 88, y: 31 },
+      { x: 90, y: 54 },
+      { x: 73, y: 77 },
     ],
   };
   const preset = presets[totalSeats];
@@ -1595,6 +1623,7 @@ function renderShowdown(table) {
 function renderControls(table, human) {
   const legal = table.legalActions;
   const canAct = table.isViewerTurn && table.status === "playing";
+  els.actionConsole.classList.toggle("is-action-ready", canAct);
   const maxBet = Math.max(0, legal.maxBet || human?.stack || 0);
   const minAmount = Math.max(0, legal.canRaise ? legal.minRaiseTo : legal.minBet || table.config.bigBlind);
   const step = Math.max(1, table.config.smallBlind);
@@ -1689,7 +1718,8 @@ function renderSetupNotice() {
 }
 
 function renderNotice() {
-  els.actionNotice.textContent = state.actionNotice;
+  const turnPrompt = state.table?.isViewerTurn && state.table?.status === "playing" ? "Your turn" : "";
+  els.actionNotice.textContent = state.actionNotice || turnPrompt;
 }
 
 function renderSoundState() {
