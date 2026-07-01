@@ -2539,6 +2539,7 @@ function render() {
   const hasTable = Boolean(state.table);
   const showQuiz = state.quizOpen;
 
+  document.body.classList.toggle("is-quiz-open", showQuiz);
   els.setupPanel.classList.toggle("is-hidden", hasTable || showQuiz);
   els.leaderboardPanel.classList.toggle("is-hidden", hasTable || showQuiz);
   els.tablePanel.classList.toggle("is-hidden", !hasTable || showQuiz);
