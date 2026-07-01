@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Poker Room</title>
-    <link rel="stylesheet" href="styles.css?v=player-actions-3" />
+    <link rel="stylesheet" href="styles.css?v=player-actions-11" />
   </head>
   <body>
     <div class="app-shell">
@@ -497,8 +497,24 @@
               <div class="table-action-dock" id="actionConsole">
                 <div class="amount-control">
                   <label for="amountInput">Amount</label>
-                  <input id="amountInput" type="range" min="20" max="1500" step="10" value="40" />
+                  <div class="amount-slider-wrap">
+                    <input id="amountInput" type="range" min="0" max="100" step="1" value="0" />
+                    <div class="amount-steps" aria-hidden="true">
+                      <span>Min</span>
+                      <span>2x</span>
+                      <span>3x</span>
+                      <span>5x</span>
+                      <span>All in</span>
+                    </div>
+                  </div>
                   <output id="amountOutput">40</output>
+                  <div class="amount-presets" aria-label="Raise presets">
+                    <button type="button" data-raise-preset="min">Min</button>
+                    <button type="button" data-raise-preset="2">2x</button>
+                    <button type="button" data-raise-preset="3">3x</button>
+                    <button type="button" data-raise-preset="5">5x</button>
+                    <button type="button" data-raise-preset="all-in">All In</button>
+                  </div>
                 </div>
                 <div class="button-grid">
                   <button id="foldButton" type="button">Fold</button>
@@ -634,6 +650,6 @@
       </section>
     </div>
 
-    <script src="app.js?v=player-actions-3"></script>
+    <script src="app.js?v=player-actions-5"></script>
   </body>
 </html>

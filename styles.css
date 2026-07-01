@@ -6532,3 +6532,328 @@ button,
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* In-table action chips: use the open felt beside the active user's tile. */
+.table-action-dock {
+  display: none;
+}
+
+.seat.is-you {
+  z-index: 24;
+}
+
+.seat.is-you > .table-action-dock {
+  position: absolute;
+  top: calc(100% - 33px);
+  right: auto;
+  bottom: auto;
+  left: calc(100% + 2px);
+  z-index: 26;
+  display: none;
+  width: clamp(218px, 21vw, 236px);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  pointer-events: none;
+  transform: none;
+}
+
+.seat.is-you > .table-action-dock.is-action-ready {
+  display: grid;
+  pointer-events: auto;
+}
+
+.seat.is-you[data-seat-index="6"] > .table-action-dock,
+.seat.is-you[data-seat-index="7"] > .table-action-dock,
+.seat.is-you[data-seat-index="8"] > .table-action-dock {
+  right: calc(100% + 2px);
+  left: auto;
+}
+
+.seat.is-you[data-seat-index="3"] > .table-action-dock,
+.seat.is-you[data-seat-index="4"] > .table-action-dock,
+.seat.is-you[data-seat-index="5"] > .table-action-dock {
+  top: calc(100% + 6px);
+  left: 50%;
+  right: auto;
+  transform: translateX(-50%);
+}
+
+.seat.is-you > .table-action-dock #betButton,
+.seat.is-you > .table-action-dock #allInButton,
+.seat.is-you > .table-action-dock #nextHandButton {
+  display: none !important;
+}
+
+.seat.is-you > .table-action-dock .amount-control {
+  display: none;
+}
+
+.seat.is-you > .table-action-dock.has-raise-range.is-raise-composer-active .amount-control {
+  display: grid;
+  grid-template-columns: auto minmax(76px, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+  order: 2;
+  width: min(232px, 100%);
+  margin: 5px auto 0;
+  padding: 4px 7px;
+  border: 1px solid rgba(255, 224, 122, 0.3);
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at 14% 50%, rgba(255, 224, 122, 0.2), transparent 30%),
+    linear-gradient(180deg, rgba(12, 18, 18, 0.82), rgba(3, 8, 9, 0.72));
+  box-shadow:
+    0 0 0 2px rgba(3, 8, 8, 0.48),
+    0 8px 15px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.09);
+}
+
+.seat.is-you > .table-action-dock.has-raise-range.is-raise-composer-active .amount-control label {
+  color: rgba(255, 248, 234, 0.8);
+  font-size: 0.48rem;
+  font-weight: 950;
+  line-height: 1;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.seat.is-you > .table-action-dock.has-raise-range.is-raise-composer-active .amount-slider-wrap {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.seat.is-you > .table-action-dock.has-raise-range.is-raise-composer-active .amount-control input[type="range"] {
+  min-width: 0;
+  height: 18px;
+  accent-color: #ffe06f;
+}
+
+.seat.is-you > .table-action-dock.has-raise-range.is-raise-composer-active .amount-steps {
+  display: grid;
+  grid-template-columns: repeat(var(--amount-preset-count, 4), max-content);
+  justify-content: space-between;
+  gap: 0;
+  padding: 0 1px;
+  color: rgba(255, 248, 234, 0.56);
+  font-size: 0.34rem;
+  font-weight: 950;
+  line-height: 1;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.seat.is-you > .table-action-dock.has-raise-range.is-raise-composer-active .amount-control output {
+  display: grid;
+  place-items: center;
+  min-width: 38px;
+  min-height: 20px;
+  padding: 0 6px;
+  border: 1px solid rgba(255, 224, 122, 0.36);
+  border-radius: 999px;
+  color: #ffe06f;
+  background: rgba(4, 9, 10, 0.76);
+  font-size: 0.58rem;
+  font-weight: 950;
+  line-height: 1;
+}
+
+.seat.is-you > .table-action-dock.has-raise-range.is-raise-composer-active .amount-presets {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(var(--amount-preset-count, 4), minmax(0, 1fr));
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.seat.is-you > .table-action-dock.has-raise-range.is-raise-composer-active .amount-presets button {
+  min-height: 20px;
+  padding: 0 4px;
+  border: 1px solid rgba(255, 224, 122, 0.34);
+  border-radius: 999px;
+  color: rgba(255, 248, 234, 0.82);
+  background:
+    linear-gradient(180deg, rgba(255, 248, 234, 0.1), rgba(255, 248, 234, 0)),
+    rgba(3, 9, 10, 0.68);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 4px 8px rgba(0, 0, 0, 0.24);
+  font-size: 0.44rem;
+  font-weight: 950;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.seat.is-you > .table-action-dock.has-raise-range.is-raise-composer-active .amount-presets button.active,
+.seat.is-you > .table-action-dock.has-raise-range.is-raise-composer-active .amount-presets button:not(:disabled):hover,
+.seat.is-you > .table-action-dock.has-raise-range.is-raise-composer-active .amount-presets button:not(:disabled):focus-visible {
+  border-color: rgba(255, 224, 122, 0.78);
+  color: #18120a;
+  background: linear-gradient(180deg, #ffe07a, #c78d18);
+  outline: none;
+}
+
+.seat.is-you > .table-action-dock .notice {
+  display: none;
+}
+
+.seat.is-you > .table-action-dock .button-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 5px;
+  order: 1;
+  width: 100%;
+}
+
+.seat.is-you > .table-action-dock .button-grid button {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 28px;
+  padding: 0 5px;
+  overflow: hidden;
+  border-width: 1px;
+  border-radius: 999px;
+  color: #fff8ea;
+  font-size: 0.47rem;
+  font-weight: 950;
+  letter-spacing: 0;
+  line-height: 1;
+  text-align: center;
+  text-transform: uppercase;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.48);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.24),
+    0 0 0 2px rgba(3, 8, 8, 0.62),
+    0 7px 13px rgba(0, 0, 0, 0.34);
+}
+
+.seat.is-you > .table-action-dock .button-grid button::after {
+  content: "";
+  position: absolute;
+  inset: 2px 5px auto;
+  height: 34%;
+  border-radius: inherit;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.25), transparent);
+  pointer-events: none;
+}
+
+.seat.is-you > .table-action-dock .button-grid button:not(:disabled) {
+  cursor: pointer;
+}
+
+.seat.is-you > .table-action-dock .button-grid button:not(:disabled):hover,
+.seat.is-you > .table-action-dock .button-grid button:not(:disabled):focus-visible {
+  filter: brightness(1.08);
+  outline: none;
+  transform: translateY(-1px);
+}
+
+.seat.is-you > .table-action-dock .button-grid button:disabled {
+  color: rgba(255, 248, 234, 0.36);
+  opacity: 0.48;
+  filter: grayscale(0.62);
+  text-shadow: none;
+}
+
+.seat.is-you > .table-action-dock #foldButton {
+  border-color: rgba(255, 132, 132, 0.72);
+  background: linear-gradient(180deg, #ef6262, #8d1a23);
+}
+
+.seat.is-you > .table-action-dock #checkButton {
+  border-color: rgba(140, 209, 255, 0.7);
+  background: linear-gradient(180deg, #2f97e5, #0e4c86);
+}
+
+.seat.is-you > .table-action-dock #callButton {
+  border-color: rgba(104, 232, 159, 0.74);
+  background: linear-gradient(180deg, #32c977, #117140);
+}
+
+.seat.is-you > .table-action-dock #raiseButton {
+  border-color: rgba(255, 222, 105, 0.82);
+  color: #1a1305;
+  background: linear-gradient(180deg, #ffe07a, #c78d18);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.24);
+}
+
+@media (max-width: 720px) {
+  .seat.is-you > .table-action-dock,
+  .seat.is-you[data-seat-index="6"] > .table-action-dock,
+  .seat.is-you[data-seat-index="7"] > .table-action-dock,
+  .seat.is-you[data-seat-index="8"] > .table-action-dock {
+    top: calc(100% - 30px);
+    right: auto;
+    bottom: auto;
+    left: calc(100% + 2px);
+    width: 190px;
+    padding: 0;
+    transform: none;
+  }
+
+  .seat.is-you > .table-action-dock .button-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 4px;
+  }
+
+  .seat.is-you > .table-action-dock .button-grid button {
+    min-height: 27px;
+    padding: 0 3px;
+    font-size: 0.38rem;
+  }
+
+  .seat.is-you > .table-action-dock.has-raise-range.is-raise-composer-active .amount-control {
+    grid-template-columns: auto minmax(58px, 1fr) auto;
+    gap: 5px;
+    width: min(184px, 100%);
+    padding: 3px 5px;
+  }
+
+  .seat.is-you > .table-action-dock.has-raise-range.is-raise-composer-active .amount-control label {
+    font-size: 0.4rem;
+  }
+
+  .seat.is-you > .table-action-dock.has-raise-range.is-raise-composer-active .amount-control output {
+    min-width: 34px;
+    min-height: 18px;
+    padding: 0 4px;
+    font-size: 0.48rem;
+  }
+
+  .seat.is-you > .table-action-dock.has-raise-range.is-raise-composer-active .amount-presets button {
+    min-height: 18px;
+    padding: 0 2px;
+    font-size: 0.36rem;
+  }
+
+  .seat.is-you > .table-action-dock.has-raise-range.is-raise-composer-active .amount-steps {
+    font-size: 0.3rem;
+  }
+}
+
+.seat.is-you[data-seat-count="7"] > .table-action-dock,
+.seat.is-you[data-seat-count="8"] > .table-action-dock,
+.seat.is-you[data-seat-count="9"] > .table-action-dock {
+  box-sizing: border-box;
+  width: clamp(218px, 21vw, 236px);
+  max-width: 236px;
+}
+
+.seat.is-you[data-seat-count="7"] > .table-action-dock .button-grid,
+.seat.is-you[data-seat-count="8"] > .table-action-dock .button-grid,
+.seat.is-you[data-seat-count="9"] > .table-action-dock .button-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.seat.is-you[data-seat-count="7"] > .table-action-dock .button-grid button,
+.seat.is-you[data-seat-count="8"] > .table-action-dock .button-grid button,
+.seat.is-you[data-seat-count="9"] > .table-action-dock .button-grid button {
+  width: 100%;
+  min-width: 0;
+}

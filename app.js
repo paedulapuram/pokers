@@ -144,6 +144,22 @@ const els = {
 
 const REGISTERED_SESSION_STORAGE_KEY = "pokerRegisteredSessionV1";
 const GUEST_SESSION_STORAGE_KEY = "pokerGuestSessionV1";
+const RAISE_SLIDER_MIN = 0;
+const RAISE_SLIDER_MAX = 100;
+const RAISE_SLIDER_STEP = 1;
+const RAISE_SLIDER_STOPS = [
+  { preset: "2", label: "2x", position: 0 },
+  { preset: "3", label: "3x", position: 33 },
+  { preset: "5", label: "5x", position: 67 },
+  { preset: "all-in", label: "All In", position: 100 },
+];
+const OPEN_SLIDER_STOPS = [
+  { preset: "min", label: "Min", position: 0 },
+  { preset: "2", label: "2x", position: 25 },
+  { preset: "3", label: "3x", position: 50 },
+  { preset: "5", label: "5x", position: 75 },
+  { preset: "all-in", label: "All In", position: 100 },
+];
 const CLIENT_ROLE_PERMISSIONS = {
   guest: ["practice_with_bots", "choose_practice_visibility", "play_hand", "update_guest_profile"],
   player: ["join_cash_table", "join_tournament", "claim_seat", "play_hand", "view_rankings", "update_profile"],
@@ -206,6 +222,10 @@ const state = {
   session: storedSession,
   setupNotice: "",
   actionNotice: "",
+  raiseComposerActive: false,
+  raiseComposerTurnKey: "",
+  selectedRaisePreset: "",
+  selectedRaiseAmount: 0,
   seatClaimBusy: false,
   botTurnTimer: null,
   botTurnKey: "",
@@ -400,20 +420,35 @@ els.leaveButton.addEventListener("click", () => {
   stopThinkingTick();
   state.table = null;
   state.actionNotice = "";
+  state.raiseComposerActive = false;
+  state.raiseComposerTurnKey = "";
+  state.selectedRaisePreset = "";
+  state.selectedRaiseAmount = 0;
   state.hostTablesLoaded = false;
   state.tournamentsLoaded = false;
   render();
 });
 
 els.amountInput.addEventListener("input", () => {
-  els.amountOutput.textContent = chips(Number(els.amountInput.value));
+  state.raiseComposerActive = true;
+  state.selectedRaisePreset = getRaisePresetForPosition(Number(els.amountInput.value));
+  state.selectedRaiseAmount = calculateRaiseAmountForSlider(Number(els.amountInput.value));
+  els.amountOutput.textContent = chips(state.selectedRaiseAmount);
   renderAmountActionLabels();
+  renderRaisePresets();
+});
+
+els.actionConsole.addEventListener("click", (event) => {
+  const presetButton = event.target.closest("[data-raise-preset]");
+  if (presetButton instanceof HTMLButtonElement) {
+    applyRaisePreset(presetButton.dataset.raisePreset || "");
+  }
 });
 
 els.foldButton.addEventListener("click", () => sendAction("fold"));
 els.checkButton.addEventListener("click", () => sendAction("check"));
 els.callButton.addEventListener("click", () => sendAction("call"));
-els.betButton.addEventListener("click", () => sendAction("bet", Number(els.amountInput.value)));
+els.betButton.addEventListener("click", () => sendAction("bet", getSelectedRaiseAmount()));
 els.raiseButton.addEventListener("click", () => sendIncreaseAction());
 els.allInButton.addEventListener("click", () => sendAction("all-in"));
 els.nextHandButton.addEventListener("click", startNextHand);
@@ -1571,22 +1606,50 @@ function renderShowdown(table) {
 function renderControls(table, human) {
   const legal = table.legalActions;
   const canAct = table.isViewerTurn && table.status === "playing";
-  els.actionConsole.classList.toggle("is-action-ready", canAct);
-  const maxBet = Math.max(0, legal.maxBet || human?.stack || 0);
-  const minAmount = Math.max(0, legal.canRaise ? legal.minRaiseTo : legal.minBet || table.config.bigBlind);
-  const step = Math.max(1, table.config.smallBlind);
-
-  els.amountInput.min = String(Math.min(minAmount, maxBet || minAmount));
-  els.amountInput.max = String(Math.max(maxBet, minAmount));
-  els.amountInput.step = String(step);
-
-  const currentAmount = Number(els.amountInput.value);
-  if (!Number.isFinite(currentAmount) || currentAmount < Number(els.amountInput.min) || currentAmount > Number(els.amountInput.max)) {
-    els.amountInput.value = String(Number(els.amountInput.min));
+  const canChooseAmount = canAct && (legal.canBet || legal.canRaise);
+  const raiseComposerTurnKey = getRaiseComposerTurnKey(table);
+  if (state.raiseComposerTurnKey !== raiseComposerTurnKey) {
+    state.raiseComposerTurnKey = raiseComposerTurnKey;
+    state.raiseComposerActive = false;
+    state.selectedRaisePreset = "";
+    state.selectedRaiseAmount = 0;
   }
-  els.amountOutput.textContent = chips(Number(els.amountInput.value));
+  if (!canChooseAmount) {
+    state.raiseComposerActive = false;
+    state.selectedRaisePreset = "";
+    state.selectedRaiseAmount = 0;
+  }
+  els.actionConsole.classList.toggle("is-action-ready", canAct);
+  els.actionConsole.classList.toggle("has-raise-range", canChooseAmount);
+  els.actionConsole.classList.toggle("is-raise-composer-active", canChooseAmount && state.raiseComposerActive);
+  const { min, max } = getRaiseAmountBounds(legal, table, human);
 
-  els.amountInput.disabled = !canAct || (!legal.canBet && !legal.canRaise);
+  els.amountInput.min = String(RAISE_SLIDER_MIN);
+  els.amountInput.max = String(RAISE_SLIDER_MAX);
+  els.amountInput.step = String(RAISE_SLIDER_STEP);
+
+  const currentPosition = Number(els.amountInput.value);
+  if (!Number.isFinite(currentPosition) || currentPosition < RAISE_SLIDER_MIN || currentPosition > RAISE_SLIDER_MAX) {
+    els.amountInput.value = String(RAISE_SLIDER_MIN);
+  }
+  if (!Number.isFinite(state.selectedRaiseAmount) || state.selectedRaiseAmount < min || state.selectedRaiseAmount > max) {
+    const defaultPreset = getDefaultRaisePreset(legal);
+    state.selectedRaisePreset = defaultPreset;
+    state.selectedRaiseAmount = calculateRaisePresetAmount(defaultPreset, legal, table, human);
+    els.amountInput.value = String(getRaisePresetPosition(defaultPreset, legal));
+  }
+  const amountLabel = els.amountInput.closest(".amount-control")?.querySelector("label");
+  if (amountLabel) {
+    amountLabel.textContent = legal.canRaise ? "Raise to" : legal.canBet ? "Open to" : "Amount";
+  }
+  const selectedAmount = getSelectedRaiseAmount(legal, table, human);
+  const sliderStartLabel = legal.canBet && !legal.canRaise ? "minimum" : "2x";
+  els.amountInput.title = `Slide from ${sliderStartLabel} to all-in ${chips(max)}`;
+  els.amountInput.setAttribute("aria-label", `${legal.canRaise ? "Raise" : "Bet"} amount from ${sliderStartLabel} to all-in ${chips(max)}`);
+  els.amountInput.setAttribute("aria-valuetext", chips(selectedAmount));
+  els.amountOutput.textContent = chips(selectedAmount);
+
+  els.amountInput.disabled = !canChooseAmount;
   els.foldButton.disabled = !canAct || !legal.canFold;
   els.checkButton.disabled = !canAct || !legal.canCheck;
   els.callButton.disabled = !canAct || !legal.canCall;
@@ -1595,7 +1658,19 @@ function renderControls(table, human) {
   els.allInButton.disabled = !canAct || !legal.canAllIn;
   els.callButton.textContent = legal.callAmount > 0 ? `Call ${chips(legal.callAmount)}` : "Call";
   renderAmountActionLabels(table);
+  renderRaisePresets(table, legal, canChooseAmount);
   els.nextHandButton.classList.toggle("is-hidden", table.status === "playing" || !table.isHost);
+}
+
+function getRaiseComposerTurnKey(table) {
+  if (!table) return "";
+  return [
+    table.id,
+    table.handNumber,
+    table.currentPlayerIndex,
+    table.viewerPlayerId || "",
+    table.legalActions?.currentBet || 0,
+  ].join(":");
 }
 
 function renderLearningCoach(table) {
@@ -1616,25 +1691,181 @@ function sendIncreaseAction() {
   if (!state.table) return;
 
   const legal = state.table.legalActions || {};
-  const amount = Number(els.amountInput.value);
+  const amount = getSelectedRaiseAmount(legal, state.table);
+  if (legal.canRaise || legal.canBet) {
+    if (!state.raiseComposerActive) {
+      openRaiseComposer();
+      return;
+    }
+  }
   if (legal.canRaise) {
+    state.raiseComposerActive = false;
+    state.selectedRaisePreset = "";
     sendAction("raise", amount);
     return;
   }
   if (legal.canBet) {
+    state.raiseComposerActive = false;
+    state.selectedRaisePreset = "";
     sendAction("bet", amount);
   }
 }
 
+function openRaiseComposer() {
+  if (!state.table) return;
+
+  const legal = state.table.legalActions || {};
+  const defaultPreset = getDefaultRaisePreset(legal);
+  state.raiseComposerTurnKey = getRaiseComposerTurnKey(state.table);
+  state.raiseComposerActive = true;
+  state.selectedRaisePreset = defaultPreset;
+  state.selectedRaiseAmount = calculateRaisePresetAmount(defaultPreset, legal, state.table);
+  els.amountInput.value = String(getRaisePresetPosition(defaultPreset, legal));
+  render();
+}
+
+function applyRaisePreset(preset) {
+  if (!state.table) return;
+
+  const legal = state.table.legalActions || {};
+  if (!legal.canRaise && !legal.canBet) return;
+
+  state.raiseComposerTurnKey = getRaiseComposerTurnKey(state.table);
+  state.raiseComposerActive = true;
+  state.selectedRaisePreset = preset;
+  state.selectedRaiseAmount = calculateRaisePresetAmount(preset, legal, state.table);
+  els.amountInput.value = String(getRaisePresetPosition(preset, legal));
+  els.amountOutput.textContent = chips(state.selectedRaiseAmount);
+  renderAmountActionLabels();
+  render();
+}
+
+function getDefaultRaisePreset(legal = state.table?.legalActions || {}) {
+  return legal.canBet && !legal.canRaise ? "min" : "2";
+}
+
+function getRaiseSliderStops(legal = state.table?.legalActions || {}) {
+  return legal.canBet && !legal.canRaise ? OPEN_SLIDER_STOPS : RAISE_SLIDER_STOPS;
+}
+
+function getRaiseAmountBounds(legal = state.table?.legalActions || {}, table = state.table, human = null) {
+  const fallbackBlind = table?.config?.bigBlind || 0;
+  const rawMin = Math.max(0, legal.canRaise ? legal.minRaiseTo : legal.minBet || fallbackBlind);
+  const rawMax = Math.max(0, legal.maxBet || human?.stack || rawMin);
+  const min = Math.min(rawMin, rawMax || rawMin);
+  const max = Math.max(rawMax, min);
+  const step = Math.max(1, table?.config?.smallBlind || 1);
+  return { min, max, step };
+}
+
+function calculateRaisePresetAmount(preset, legal = state.table?.legalActions || {}, table = state.table, human = null) {
+  const { min, max, step } = getRaiseAmountBounds(legal, table, human);
+  if (preset === "min") return min;
+  if (preset === "all-in") return max;
+
+  const multiplier = Number(preset);
+  if (!Number.isFinite(multiplier)) return min;
+
+  const base = Math.max(
+    Number(legal.currentBet || 0),
+    Number(legal.callAmount || 0),
+    Number(table?.config?.bigBlind || 0),
+  );
+  return roundAmountToStep(base * multiplier, min, max, step);
+}
+
+function getRaiseAmountStops(legal = state.table?.legalActions || {}, table = state.table, human = null) {
+  return getRaiseSliderStops(legal).map((stop) => ({
+    ...stop,
+    amount: calculateRaisePresetAmount(stop.preset, legal, table, human),
+  }));
+}
+
+function calculateRaiseAmountForSlider(position, legal = state.table?.legalActions || {}, table = state.table, human = null) {
+  const { min, max, step } = getRaiseAmountBounds(legal, table, human);
+  const safePosition = Math.min(RAISE_SLIDER_MAX, Math.max(RAISE_SLIDER_MIN, Number(position || 0)));
+  const stops = getRaiseAmountStops(legal, table, human);
+  const exactStop = stops.find((stop) => Math.abs(stop.position - safePosition) < 0.5);
+  if (exactStop) return roundAmountToStep(exactStop.amount, min, max, step);
+
+  const nextIndex = stops.findIndex((stop) => safePosition < stop.position);
+  if (nextIndex <= 0) return roundAmountToStep(stops[0]?.amount ?? min, min, max, step);
+  if (nextIndex === -1) return roundAmountToStep(stops.at(-1)?.amount ?? max, min, max, step);
+
+  const previousStop = stops[nextIndex - 1];
+  const nextStop = stops[nextIndex];
+  const span = Math.max(1, nextStop.position - previousStop.position);
+  const progress = (safePosition - previousStop.position) / span;
+  const rawAmount = previousStop.amount + (nextStop.amount - previousStop.amount) * progress;
+  return roundAmountToStep(rawAmount, min, max, step);
+}
+
+function getSelectedRaiseAmount(legal = state.table?.legalActions || {}, table = state.table, human = null) {
+  const { min, max, step } = getRaiseAmountBounds(legal, table, human);
+  if (!Number.isFinite(state.selectedRaiseAmount)) {
+    state.selectedRaiseAmount = calculateRaiseAmountForSlider(Number(els.amountInput.value), legal, table, human);
+  }
+  state.selectedRaiseAmount = roundAmountToStep(state.selectedRaiseAmount, min, max, step);
+  return state.selectedRaiseAmount;
+}
+
+function getRaisePresetPosition(preset, legal = state.table?.legalActions || {}) {
+  return getRaiseSliderStops(legal).find((stop) => stop.preset === preset)?.position ?? RAISE_SLIDER_MIN;
+}
+
+function getRaisePresetForPosition(position, legal = state.table?.legalActions || {}) {
+  return getRaiseSliderStops(legal).find((stop) => Math.abs(stop.position - Number(position)) < 0.5)?.preset || "";
+}
+
+function roundAmountToStep(value, min, max, step) {
+  const safeStep = Math.max(1, Number(step || 1));
+  const bounded = Math.min(Math.max(Number(value || min), min), max);
+  return Math.min(max, Math.max(min, min + Math.round((bounded - min) / safeStep) * safeStep));
+}
+
+function renderRaisePresets(table = state.table, legal = table?.legalActions || {}, canChooseAmount = false) {
+  const buttons = els.actionConsole.querySelectorAll("[data-raise-preset]");
+  const stops = getRaiseAmountStops(legal, table);
+  els.actionConsole.style.setProperty("--amount-preset-count", String(stops.length || 4));
+  const stepLabels = els.actionConsole.querySelectorAll(".amount-steps span");
+  stepLabels.forEach((label, index) => {
+    const stop = stops[index];
+    label.hidden = !stop;
+    label.textContent = stop?.label || "";
+  });
+  buttons.forEach((button, index) => {
+    const stop = stops[index];
+    if (!stop) {
+      button.hidden = true;
+      button.disabled = true;
+      button.classList.remove("active");
+      button.textContent = "";
+      button.removeAttribute("aria-label");
+      button.removeAttribute("title");
+      return;
+    }
+    button.hidden = false;
+    const preset = stop.preset;
+    button.dataset.raisePreset = preset;
+    button.textContent = stop.label;
+    const amount = calculateRaisePresetAmount(preset, legal, table);
+    button.disabled = !canChooseAmount;
+    button.classList.toggle("active", state.selectedRaisePreset === preset);
+    button.title =
+      preset === "all-in" ? `All in ${chips(amount)}` : `${stop.label} to ${chips(amount)}`;
+    button.setAttribute("aria-label", button.title);
+  });
+}
+
 function renderAmountActionLabels(table = state.table) {
   const legal = table?.legalActions || {};
-  const amount = chips(Number(els.amountInput.value));
+  const amount = chips(getSelectedRaiseAmount(legal, table));
 
   els.betButton.textContent = legal.canBet ? `Bet ${amount}` : "Bet";
   if (legal.canRaise) {
-    els.raiseButton.textContent = `Raise ${amount}`;
+    els.raiseButton.textContent = "Raise";
   } else if (legal.canBet) {
-    els.raiseButton.textContent = `Open ${amount}`;
+    els.raiseButton.textContent = "Open";
   } else {
     els.raiseButton.textContent = "Raise";
   }
@@ -2513,6 +2744,10 @@ async function signOut() {
   state.table = null;
   state.account = null;
   state.session = null;
+  state.raiseComposerActive = false;
+  state.raiseComposerTurnKey = "";
+  state.selectedRaisePreset = "";
+  state.selectedRaiseAmount = 0;
   state.adminUsers = [];
   state.adminSelectedUserIds.clear();
   state.adminUsersLoaded = false;
