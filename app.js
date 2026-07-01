@@ -116,6 +116,8 @@ const els = {
   feltBlindLabel: document.querySelector("#feltBlindLabel"),
   feltGameId: document.querySelector("#feltGameId"),
   playersGrid: document.querySelector("#playersGrid"),
+  tableFelt: document.querySelector(".table-felt"),
+  feltLayout: document.querySelector(".felt-layout"),
   communityRow: document.querySelector("#communityRow"),
   centerPot: document.querySelector("#centerPot"),
   tableMessage: document.querySelector("#tableMessage"),
@@ -1030,7 +1032,9 @@ function renderTable() {
     ),
   ].join("");
   const ownSeat = els.playersGrid.querySelector(".seat.is-you");
-  if (ownSeat) {
+  if (isMobileTableLayout() && els.feltLayout && els.tableFelt) {
+    els.feltLayout.insertBefore(els.actionConsole, els.tableFelt.nextElementSibling);
+  } else if (ownSeat) {
     ownSeat.appendChild(els.actionConsole);
   }
   els.communityRow.innerHTML = renderCommunity(table.community);
@@ -1576,6 +1580,10 @@ function getSeatPosition(index, totalSeats) {
     x: round(50 + radius.x * Math.cos(angle)),
     y: round(50 + radius.y * Math.sin(angle)),
   };
+}
+
+function isMobileTableLayout() {
+  return Boolean(window.matchMedia?.("(max-width: 720px)").matches);
 }
 
 function renderCommunity(cards) {
