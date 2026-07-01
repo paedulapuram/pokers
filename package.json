@@ -5,6 +5,7 @@
   "description": "A full-stack Texas Hold'em poker room with role-based testing, bot seats, betting, and learning visibility modes.",
   "scripts": {
     "dev": "node server.js",
+    "dev:lan": "HOST=0.0.0.0 node server.js",
     "start": "node server.js",
     "test": "node --test tests/*.test.js"
   },

@@ -34,6 +34,31 @@ npm run dev
 
 Open `http://localhost:3000/poker/`.
 
+### Open From A Phone On The Same Wi-Fi
+
+Do not use `127.0.0.1` or `localhost` on the phone. Those addresses point back
+to the phone itself. Use the Mac's Wi-Fi IP address instead:
+
+```bash
+ipconfig getifaddr en0
+```
+
+Start the server in LAN mode:
+
+```bash
+PORT=3002 npm run dev:lan
+```
+
+If that prints `192.168.1.25` and the poker server is running on port `3002`,
+open this on the phone:
+
+```text
+http://192.168.1.25:3002/poker/
+```
+
+Keep the Mac and phone on the same Wi-Fi network, and allow the browser through
+the macOS firewall if macOS asks.
+
 Registered accounts are stored in `data/users.json`. Passwords are stored as salted
 `scrypt` hashes, never as readable text. The data file is ignored by Git and cannot
 be served by the web server.

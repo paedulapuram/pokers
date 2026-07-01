@@ -1420,13 +1420,11 @@ function renderSeat(player, slotIndex, totalSeats, seatNumber) {
           <div class="seat-meta" aria-label="${escapeHtml(player.name)} seat status">
             <span class="seat-stack-line"><span class="seat-stack-value" aria-label="Total chips ${chips(player.stack)}"><span class="chip-icon" aria-hidden="true"></span><strong>${chips(player.stack)}</strong></span></span>
             <span><span class="metric-label">Bet</span><strong>${chips(player.bet)}</strong></span>
+            <span class="seat-win-inline ${player.winChance?.percent == null ? "is-hidden-chance" : ""}"><span class="metric-label">Win</span><strong>${escapeHtml(formatWinChance(player.winChance))}</strong></span>
           </div>
         </div>
       </div>
       <div class="seat-outside-row">
-        <span class="seat-win-badge ${player.winChance?.percent == null ? "is-hidden-chance" : ""}">
-          <span>Win</span><strong>${escapeHtml(formatWinChance(player.winChance))}</strong>
-        </span>
         <span class="seat-action ${escapeHtml(actionState.className)}">
           <span class="action-dot" aria-hidden="true"></span>
           <strong>${escapeHtml(actionState.label)}</strong>
@@ -1524,81 +1522,31 @@ function compactActionLabel(action) {
 }
 
 function getSeatPosition(index, totalSeats) {
-  const presets = {
-    2: [
-      { x: 50, y: 82 },
-      { x: 50, y: 18 },
-    ],
-    3: [
-      { x: 50, y: 82 },
-      { x: 20, y: 34 },
-      { x: 80, y: 34 },
-    ],
-    4: [
-      { x: 50, y: 82 },
-      { x: 18, y: 50 },
-      { x: 50, y: 18 },
-      { x: 82, y: 50 },
-    ],
-    5: [
-      { x: 50, y: 82 },
-      { x: 17, y: 58 },
-      { x: 28, y: 22 },
-      { x: 72, y: 22 },
-      { x: 83, y: 58 },
-    ],
-    6: [
-      { x: 50, y: 82 },
-      { x: 18, y: 62 },
-      { x: 18, y: 32 },
-      { x: 50, y: 18 },
-      { x: 82, y: 32 },
-      { x: 82, y: 62 },
-    ],
-    7: [
-      { x: 50, y: 84 },
-      { x: 22, y: 68 },
-      { x: 15, y: 44 },
-      { x: 35, y: 18 },
-      { x: 65, y: 18 },
-      { x: 85, y: 44 },
-      { x: 78, y: 68 },
-    ],
-    8: [
-      { x: 50, y: 84 },
-      { x: 22, y: 70 },
-      { x: 14, y: 50 },
-      { x: 22, y: 30 },
-      { x: 50, y: 16 },
-      { x: 78, y: 30 },
-      { x: 86, y: 50 },
-      { x: 78, y: 70 },
-    ],
-    9: [
-      { x: 50, y: 84 },
-      { x: 27, y: 77 },
-      { x: 10, y: 56 },
-      { x: 12, y: 31 },
-      { x: 34, y: 19 },
-      { x: 66, y: 19 },
-      { x: 88, y: 31 },
-      { x: 90, y: 54 },
-      { x: 73, y: 77 },
-    ],
+  const seatCount = Math.min(9, Math.max(2, Number(totalSeats || 9)));
+  const slotIndex = ((Number(index) || 0) % seatCount + seatCount) % seatCount;
+  const radius = {
+    2: { x: 0, y: 34 },
+    3: { x: 31, y: 33 },
+    4: { x: 35, y: 34 },
+    5: { x: 38, y: 34 },
+    6: { x: 39, y: 34 },
+    7: { x: 40, y: 34 },
+    8: { x: 40, y: 34 },
+    9: { x: 40, y: 34 },
+  }[seatCount];
+  const angle = (90 + slotIndex * (360 / seatCount)) * (Math.PI / 180);
+  const round = (value) => Math.round(value * 10) / 10;
+
+  return {
+    x: round(50 + radius.x * Math.cos(angle)),
+    y: round(50 + radius.y * Math.sin(angle)),
   };
-  const preset = presets[totalSeats];
-
-  if (preset?.[index]) {
-    return preset[index];
-  }
-
-  return { x: 50, y: 50 };
 }
 
 function renderCommunity(cards) {
   const rendered = cards.map(renderCard);
   while (rendered.length < 5) {
-    rendered.push('<div class="card empty" aria-hidden="true"><span></span><span class="card-mid">·</span><span></span></div>');
+    rendered.push('<div class="card empty" aria-hidden="true"><span class="card-mid">·</span></div>');
   }
   return rendered.join("");
 }
@@ -1696,19 +1644,19 @@ function renderCard(card) {
   if (card.hidden) {
     return `
       <div class="card back" aria-label="Hidden card">
-        <span></span>
         <span class="card-mid">◆</span>
-        <span></span>
       </div>
     `;
   }
 
   const colorClass = card.color === "red" ? "red" : "black";
+  const label = escapeHtml(card.label);
+  const suit = escapeHtml(card.suitSymbol);
   return `
     <div class="card ${colorClass}" aria-label="${escapeHtml(card.display)}">
-      <span>${escapeHtml(card.label)}</span>
-      <span class="card-mid">${escapeHtml(card.suitSymbol)}</span>
-      <span class="card-bottom">${escapeHtml(card.label)}</span>
+      <span class="card-corner card-top">${label}</span>
+      <span class="card-mid" aria-hidden="true">${suit}</span>
+      <span class="card-corner card-bottom">${label}</span>
     </div>
   `;
 }
