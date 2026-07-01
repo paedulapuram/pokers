@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Poker Room</title>
-    <link rel="stylesheet" href="styles.css?v=mobile-table-1" />
+    <link rel="stylesheet" href="styles.css?v=quiz-bank-1" />
   </head>
   <body>
     <div class="app-shell">
@@ -36,6 +36,7 @@
             <button class="link-button" id="signInLink" type="button">Sign In</button>
             <button class="link-button" id="signUpLink" type="button">Sign Up</button>
             <button class="link-button" id="guestLink" type="button">Guest</button>
+            <button class="link-button" id="quizLink" type="button">Quiz</button>
             <button class="link-button is-hidden" id="signOutButton" type="button">Sign Out</button>
             <button class="link-button sound-toggle" id="soundToggleButton" type="button" aria-pressed="true">
               Sound On
@@ -421,6 +422,67 @@
           <p class="notice" id="rankingsNotice" role="status"></p>
         </section>
 
+        <section class="quiz-panel is-hidden" id="quizPanel" aria-label="Poker quiz room">
+          <section class="quiz-header">
+            <div>
+              <span class="eyebrow">Quiz room</span>
+              <h2>Poker Decision Lab</h2>
+              <p id="quizStreetSummary">Choose a street and make the table decision.</p>
+            </div>
+            <button class="ghost-button" id="quizBackButton" type="button">Lobby</button>
+          </section>
+
+          <section class="quiz-room">
+            <aside class="quiz-category-card">
+              <span class="eyebrow">Street categories</span>
+              <div class="quiz-category-tabs" id="quizCategoryTabs" role="tablist" aria-label="Quiz categories"></div>
+              <div class="quiz-scout-card">
+                <span id="quizLevelLabel">Starter hand</span>
+                <strong id="quizDecisionLabel">Decision point</strong>
+              </div>
+            </aside>
+
+            <section class="quiz-table-card">
+              <div class="quiz-felt">
+                <div class="quiz-seat-map" id="quizOpponents" aria-label="Quiz table seats"></div>
+                <div class="quiz-board-zone">
+                  <div class="community-row" id="quizBoardCards"></div>
+                  <div class="pot-chip quiz-pot">
+                    <span>Pot</span>
+                    <strong id="quizPot">0</strong>
+                  </div>
+                </div>
+                <div class="quiz-hero-seat is-hidden" aria-hidden="true">
+                  <div>
+                    <span class="eyebrow">Hero</span>
+                    <strong id="quizHeroPosition">Button</strong>
+                  </div>
+                  <div class="hole-row" id="quizHeroCards"></div>
+                </div>
+              </div>
+
+              <div class="quiz-question-card">
+                <div class="quiz-question-head">
+                  <div>
+                    <span class="eyebrow" id="quizCategoryLabel">Pre-flop</span>
+                    <h3 id="quizQuestionTitle">What is your play?</h3>
+                  </div>
+                  <span class="quiz-stakes" id="quizStakes">10 / 20</span>
+                </div>
+                <p id="quizScenario"></p>
+                <div class="quiz-actions" id="quizChoices" aria-label="Quiz answer choices"></div>
+                <div class="quiz-feedback is-hidden" id="quizFeedback" role="status"></div>
+                <div class="quiz-navigator" aria-label="Quiz question navigation">
+                  <button class="quiz-arrow-button" id="quizPrevButton" type="button">Previous</button>
+                  <span id="quizProgressLabel">Question 1 of 1</span>
+                  <button class="quiz-arrow-button" id="quizNextButton" type="button">Next</button>
+                  <small id="quizNavigatorHint">Answer this spot to unlock the next question.</small>
+                </div>
+              </div>
+            </section>
+          </section>
+        </section>
+
         <section class="table-panel is-hidden" id="tablePanel">
           <section class="table-header">
             <div>
@@ -650,6 +712,6 @@
       </section>
     </div>
 
-    <script src="app.js?v=mobile-table-1"></script>
+    <script src="app.js?v=quiz-bank-1"></script>
   </body>
 </html>
