@@ -61,10 +61,8 @@ const els = {
   rankingsNotice: document.querySelector("#rankingsNotice"),
   quizPanel: document.querySelector("#quizPanel"),
   quizBackButton: document.querySelector("#quizBackButton"),
-  quizStreetSummary: document.querySelector("#quizStreetSummary"),
   quizCategoryTabs: document.querySelector("#quizCategoryTabs"),
-  quizLevelLabel: document.querySelector("#quizLevelLabel"),
-  quizDecisionLabel: document.querySelector("#quizDecisionLabel"),
+  quizOddsCard: document.querySelector("#quizOddsCard"),
   quizOpponents: document.querySelector("#quizOpponents"),
   quizBoardCards: document.querySelector("#quizBoardCards"),
   quizPot: document.querySelector("#quizPot"),
@@ -76,9 +74,12 @@ const els = {
   quizScenario: document.querySelector("#quizScenario"),
   quizChoices: document.querySelector("#quizChoices"),
   quizFeedback: document.querySelector("#quizFeedback"),
+  quizPositionLens: document.querySelector("#quizPositionLens"),
   quizPrevButton: document.querySelector("#quizPrevButton"),
   quizNextButton: document.querySelector("#quizNextButton"),
+  quizNavButtons: document.querySelectorAll("[data-quiz-nav]"),
   quizProgressLabel: document.querySelector("#quizProgressLabel"),
+  quizProgressLabels: document.querySelectorAll("[data-quiz-progress]"),
   quizNavigatorHint: document.querySelector("#quizNavigatorHint"),
   playerIdentityGroup: document.querySelector("#playerIdentityGroup"),
   createTableSection: document.querySelector("#createTableSection"),
@@ -242,13 +243,43 @@ const QUIZ_CATEGORIES = [
   { id: "river", label: "River", summary: "Value bets, bluff catchers, blockers, and final pot odds." },
 ];
 const QUIZ_TABLE_POSITIONS = [
-  { id: "button", label: "Dealer", short: "D", defaultName: "Mia", avatar: "M", status: "On button" },
-  { id: "small-blind", label: "Small Blind", short: "SB", defaultName: "Ari", avatar: "A", status: "Posts 10" },
-  { id: "big-blind", label: "Big Blind", short: "BB", defaultName: "Ben", avatar: "B", status: "Posts 20" },
-  { id: "under-the-gun", label: "Under the Gun", short: "UTG", defaultName: "Noah", avatar: "N", status: "Waiting" },
-  { id: "hijack", label: "Hijack", short: "HJ", defaultName: "Ivy", avatar: "I", status: "Waiting" },
-  { id: "cutoff", label: "Cutoff", short: "CO", defaultName: "Cruz", avatar: "C", status: "Waiting" },
+  { id: "button", label: "Dealer", short: "D", defaultName: "Mia", avatar: "M", status: "Gone" },
+  { id: "small-blind", label: "Small Blind", short: "SB", defaultName: "Ari", avatar: "A", status: "Gone" },
+  { id: "big-blind", label: "Big Blind", short: "BB", defaultName: "Ben", avatar: "B", status: "Gone" },
+  { id: "under-the-gun", label: "Under the Gun", short: "UTG", defaultName: "Noah", avatar: "N", status: "Gone" },
+  { id: "hijack", label: "Hijack", short: "HJ", defaultName: "Ivy", avatar: "I", status: "Gone" },
+  { id: "cutoff", label: "Cutoff", short: "CO", defaultName: "Cruz", avatar: "C", status: "Gone" },
 ];
+const QUIZ_RANK_VALUES = Object.freeze({
+  2: 2,
+  3: 3,
+  4: 4,
+  5: 5,
+  6: 6,
+  7: 7,
+  8: 8,
+  9: 9,
+  10: 10,
+  J: 11,
+  Q: 12,
+  K: 13,
+  A: 14,
+});
+const QUIZ_RANK_LABELS = Object.freeze({
+  2: "2",
+  3: "3",
+  4: "4",
+  5: "5",
+  6: "6",
+  7: "7",
+  8: "8",
+  9: "9",
+  10: "10",
+  11: "J",
+  12: "Q",
+  13: "K",
+  14: "A",
+});
 const QUIZ_QUESTIONS = {
   preflop: [
     {
@@ -1840,6 +1871,8 @@ const BOT_THINK_DELAY_MS = 3000;
 const THINKING_TICK_MS = 420;
 const TABLE_POLL_MS = 1000;
 const TOURNAMENT_POLL_MS = 5000;
+let lastQuizActivationKey = "";
+let lastQuizActivationAt = 0;
 
 els.signInLink.addEventListener("click", () => showAuthPanel("signin"));
 els.signUpLink.addEventListener("click", () => showAuthPanel("signup"));
@@ -1924,21 +1957,26 @@ els.rankingsRefreshButton.addEventListener("click", loadRankings);
 els.quizCategoryTabs.addEventListener("click", (event) => {
   const button = event.target.closest("[data-quiz-category]");
   if (button instanceof HTMLButtonElement) {
-    state.quizCategory = button.dataset.quizCategory || "preflop";
-    state.quizSelectedChoice = getCurrentQuizAnswerId();
-    renderQuiz();
+    selectQuizCategory(button.dataset.quizCategory || "preflop");
   }
 });
 els.quizChoices.addEventListener("click", (event) => {
-  const button = event.target.closest("[data-quiz-choice]");
-  if (button instanceof HTMLButtonElement) {
-    state.quizSelectedChoice = button.dataset.quizChoice || "";
-    state.quizAnswers[getQuizAnswerKey()] = state.quizSelectedChoice;
-    renderQuiz();
+  const control = event.target.closest("[data-quiz-choice]");
+  if (control instanceof HTMLElement) {
+    selectQuizChoice(control.dataset.quizChoice || "");
   }
 });
-els.quizPrevButton.addEventListener("click", () => moveQuizQuestion(-1));
-els.quizNextButton.addEventListener("click", () => moveQuizQuestion(1));
+els.quizNavButtons.forEach((button) => {
+  button.addEventListener("click", () => moveQuizQuestion(Number(button.dataset.quizNav || 0)));
+});
+["pointerdown", "mousedown", "touchend", "click"].forEach((eventName) => {
+  els.quizPanel.addEventListener(eventName, handleQuizPanelActivation, true);
+  document.addEventListener(eventName, handleQuizPanelActivation, true);
+});
+els.quizPanel.addEventListener("keydown", (event) => {
+  if (event.key !== "Enter" && event.key !== " ") return;
+  handleQuizPanelActivation(event);
+}, true);
 els.hostRoomList.addEventListener("click", (event) => {
   const viewButton = event.target.closest("[data-host-view]");
   const closeButton = event.target.closest("[data-host-close]");
@@ -2587,6 +2625,114 @@ function closeQuiz() {
   render();
 }
 
+function focusQuizFeedback() {
+  if (els.quizFeedback.classList.contains("is-hidden")) return;
+  if (!shouldAutoScrollQuizPanel()) return;
+  window.requestAnimationFrame(() => {
+    els.quizFeedback.scrollIntoView({
+      block: "nearest",
+      behavior: "smooth",
+    });
+  });
+}
+
+function focusQuizQuestion() {
+  const questionCard = document.querySelector(".quiz-question-card");
+  if (!questionCard) return;
+  if (!shouldAutoScrollQuizPanel()) return;
+  window.requestAnimationFrame(() => {
+    questionCard.scrollIntoView({
+      block: "start",
+      behavior: "smooth",
+    });
+  });
+}
+
+function shouldAutoScrollQuizPanel() {
+  return window.matchMedia("(max-width: 860px)").matches;
+}
+
+function selectQuizCategory(categoryId) {
+  const nextCategory = QUIZ_CATEGORIES.some((item) => item.id === categoryId) ? categoryId : "preflop";
+  state.quizCategory = nextCategory;
+  state.quizSelectedChoice = getCurrentQuizAnswerId();
+  renderQuiz();
+  focusQuizQuestion();
+}
+
+function selectQuizChoice(choiceId) {
+  if (!choiceId) return;
+  state.quizSelectedChoice = choiceId;
+  state.quizAnswers[getQuizAnswerKey()] = choiceId;
+  renderQuiz();
+  focusQuizFeedback();
+}
+
+function bindQuizControls() {
+  els.quizCategoryTabs.querySelectorAll("[data-quiz-category]").forEach((button) => {
+    button.addEventListener("click", (event) => {
+      event.stopPropagation();
+      activateQuizControl(button);
+    });
+  });
+  els.quizChoices.querySelectorAll("[data-quiz-choice]").forEach((button) => {
+    button.addEventListener("click", (event) => {
+      event.stopPropagation();
+      activateQuizControl(button);
+    });
+  });
+  els.quizChoices.querySelectorAll('input[name="quizChoice"]').forEach((input) => {
+    input.addEventListener("change", () => {
+      if (input instanceof HTMLInputElement && input.checked) {
+        selectQuizChoice(input.value);
+      }
+    });
+  });
+}
+
+function handleQuizPanelActivation(event) {
+  if (!(event.target instanceof Element)) return;
+  const handled = activateQuizControl(event.target);
+  if (handled) {
+    event.preventDefault();
+    if (typeof event.stopImmediatePropagation === "function") {
+      event.stopImmediatePropagation();
+    } else {
+      event.stopPropagation();
+    }
+  }
+}
+
+function activateQuizControl(target) {
+  const categoryButton = target.closest("[data-quiz-category]");
+  if (categoryButton instanceof HTMLButtonElement && els.quizCategoryTabs.contains(categoryButton)) {
+    const categoryId = categoryButton.dataset.quizCategory || "preflop";
+    if (isDuplicateQuizActivation(`category:${categoryId}`)) return true;
+    selectQuizCategory(categoryId);
+    return true;
+  }
+
+  const choiceButton = target.closest("[data-quiz-choice]");
+  if (choiceButton instanceof HTMLElement && els.quizChoices.contains(choiceButton)) {
+    const choiceId = choiceButton.dataset.quizChoice || "";
+    if (isDuplicateQuizActivation(`choice:${state.quizCategory}:${getQuizQuestionIndex()}:${choiceId}`)) return true;
+    selectQuizChoice(choiceId);
+    return true;
+  }
+
+  return false;
+}
+
+function isDuplicateQuizActivation(key) {
+  const now = Date.now();
+  if (key && key === lastQuizActivationKey && now - lastQuizActivationAt < 260) {
+    return true;
+  }
+  lastQuizActivationKey = key;
+  lastQuizActivationAt = now;
+  return false;
+}
+
 function renderQuiz() {
   const category = QUIZ_CATEGORIES.find((item) => item.id === state.quizCategory) || QUIZ_CATEGORIES[0];
   const questions = getQuizQuestionList(category.id);
@@ -2594,13 +2740,10 @@ function renderQuiz() {
   const question = questions[questionIndex] || questions[0];
   const selectedChoiceId = getCurrentQuizAnswerId(category.id, questionIndex);
   const selectedChoice = question.choices.find((choice) => choice.id === selectedChoiceId);
+  const oddsProfile = selectedChoice ? buildSafeQuizOddsProfile(question, category.id) : null;
 
-  els.quizStreetSummary.textContent = category.summary;
-  els.quizLevelLabel.textContent = `${question.level} · ${questionIndex + 1}/${questions.length}`;
-  els.quizDecisionLabel.textContent = question.decision;
   els.quizCategoryTabs.innerHTML = QUIZ_CATEGORIES.map(
     (item) => {
-      const questionCount = getQuizQuestionList(item.id).length;
       return `
         <button
           class="${item.id === category.id ? "active" : ""}"
@@ -2609,7 +2752,6 @@ function renderQuiz() {
           aria-pressed="${item.id === category.id}"
         >
           <span>${escapeHtml(item.label)}</span>
-          <small>${questionCount} ${questionCount === 1 ? "spot" : "spots"}</small>
         </button>
       `;
     },
@@ -2623,24 +2765,35 @@ function renderQuiz() {
   els.quizQuestionTitle.textContent = question.title;
   els.quizStakes.textContent = question.stakes;
   els.quizScenario.textContent = question.scenario;
-  els.quizChoices.innerHTML = question.choices.map(
+  els.quizOddsCard.innerHTML = renderQuizOddsCard(oddsProfile);
+  const hasPositionLens = Array.isArray(question.positionLens) && question.positionLens.length > 0;
+  els.quizPositionLens.classList.toggle("is-empty", !hasPositionLens);
+  els.quizPositionLens.classList.toggle("is-pending", hasPositionLens && !selectedChoice);
+  els.quizPositionLens.innerHTML = selectedChoice ? renderQuizPositionLens(question) : "";
+  const quizChoicesHtml = question.choices.map(
     (choice) => `
-      <button
+      <label
         class="${choice.best ? "best-choice" : ""} ${choice.id === selectedChoiceId ? "selected" : ""}"
-        type="button"
         data-quiz-choice="${escapeHtml(choice.id)}"
       >
+        <input
+          type="radio"
+          name="quizChoice"
+          value="${escapeHtml(choice.id)}"
+          ${choice.id === selectedChoiceId ? "checked" : ""}
+        />
         <span>${escapeHtml(choice.label)}</span>
-      </button>
+      </label>
     `,
   ).join("");
+  els.quizChoices.innerHTML = quizChoicesHtml;
+  bindQuizControls();
   if (selectedChoice) {
     els.quizFeedback.classList.remove("is-hidden");
     els.quizFeedback.classList.toggle("is-best", Boolean(selectedChoice.best));
     els.quizFeedback.innerHTML = `
       <span>${escapeHtml(selectedChoice.result)}</span>
       <p>${escapeHtml(selectedChoice.feedback)}</p>
-      ${renderQuizPositionLens(question)}
     `;
   } else {
     els.quizFeedback.classList.add("is-hidden");
@@ -2648,6 +2801,400 @@ function renderQuiz() {
     els.quizFeedback.innerHTML = "";
   }
   renderQuizNavigator(category.id, questionIndex, questions.length, selectedChoice);
+}
+
+function renderQuizOddsCard(profile) {
+  if (!profile) {
+    return `
+      <span class="eyebrow">Odds coach</span>
+      <p>Answer the spot to reveal pot odds, equity, and helpful cards.</p>
+    `;
+  }
+
+  return `
+    <span class="eyebrow">Odds coach</span>
+    <div class="quiz-odds-grid">
+      <article>
+        <span>Pot odds</span>
+        <strong>${escapeHtml(profile.potOdds.label)}</strong>
+        <small>${escapeHtml(profile.potOdds.detail)}</small>
+      </article>
+      <article>
+        <span>Equity</span>
+        <strong>${escapeHtml(profile.equity.label)}</strong>
+        <small>${escapeHtml(profile.equity.detail)}</small>
+      </article>
+    </div>
+    <div class="quiz-outs-list">
+      <span>Helpful cards</span>
+      <p>${escapeHtml(profile.helpfulCards)}</p>
+    </div>
+    <p class="quiz-odds-note">${escapeHtml(profile.note)}</p>
+  `;
+}
+
+function renderQuizFeedbackOdds(profile) {
+  if (!profile) return "";
+
+  return `
+    <section class="quiz-feedback-odds" aria-label="Odds and equity summary">
+      <b>${escapeHtml(profile.potOdds.label)} pot odds</b>
+      <b>${escapeHtml(profile.equity.label)} equity</b>
+      <p>${escapeHtml(profile.helpfulCards)}</p>
+    </section>
+  `;
+}
+
+function buildSafeQuizOddsProfile(question, categoryId) {
+  try {
+    return buildQuizOddsProfile(question, categoryId);
+  } catch {
+    return null;
+  }
+}
+
+function buildQuizOddsProfile(question, categoryId) {
+  const bestChoice = getQuizBestChoice(question);
+  const outs = buildQuizOutsProfile(question, categoryId);
+  const madeHand = describeQuizMadeHand(question);
+  const potOdds = buildQuizPotOdds(question, bestChoice);
+  const equity = buildQuizEquityEstimate(question, categoryId, outs, madeHand);
+
+  return {
+    potOdds,
+    equity,
+    helpfulCards: outs.helpfulCards,
+    note:
+      "Quick estimate: outs use the rule of 4 on the flop and rule of 2 on the turn. Real equity changes with villain range and blockers.",
+  };
+}
+
+function getQuizBestChoice(question) {
+  return question.choices.find((choice) => choice.best) || question.choices[0] || {};
+}
+
+function buildQuizPotOdds(question, choice) {
+  const pot = Number(question.pot) || 0;
+  const action = `${choice.id || ""} ${choice.label || ""}`.toLowerCase();
+  const parsedAmount = getQuizChoiceAmount(choice);
+  const isCall = action.includes("call");
+  const isBetOrRaise = action.includes("bet") || action.includes("raise") || action.includes("3-bet") || action.includes("re-raise");
+  const isCheckOrFold = action.includes("check") || action.includes("fold");
+  const amount = parsedAmount || (isCall ? inferQuizCallAmount(question) : 0);
+
+  if (isCall && amount > 0 && pot > 0) {
+    const percent = Math.round((amount / (pot + amount)) * 100);
+    return {
+      label: `${percent}%`,
+      detail: `Calling ${chips(amount)} into ${chips(pot)} needs about ${percent}% equity.`,
+    };
+  }
+
+  if (isBetOrRaise && parsedAmount > 0 && pot > 0) {
+    const percent = Math.round((parsedAmount / (pot + parsedAmount)) * 100);
+    return {
+      label: `${percent}%`,
+      detail: `Risking ${chips(parsedAmount)} into ${chips(pot)} needs about ${percent}% folds as a pure bluff.`,
+    };
+  }
+
+  if (action.includes("all-in")) {
+    return {
+      label: "Stack risk",
+      detail: "All-in decisions depend on stack depth, fold equity, and how often worse hands call.",
+    };
+  }
+
+  if (isCheckOrFold) {
+    return {
+      label: "0%",
+      detail: "No extra chips are committed, so this is a pot-control or discipline decision.",
+    };
+  }
+
+  return {
+    label: "Estimate",
+    detail: "Compare the required chips to the final pot before continuing.",
+  };
+}
+
+function buildQuizEquityEstimate(question, categoryId, outs, madeHand) {
+  if (categoryId === "preflop") {
+    const percent = estimatePreflopEquity(question);
+    return {
+      label: `~${percent}%`,
+      detail: `${describeQuizStartingHand(question)} before the board, adjusted for position and range pressure.`,
+    };
+  }
+
+  if (categoryId === "river") {
+    return {
+      label: `~${madeHand.equity}%`,
+      detail: `${madeHand.label}; no draw cards remain, so value and blockers matter most.`,
+    };
+  }
+
+  const multiplier = categoryId === "flop" ? 4 : 2;
+  const drawEquity = outs.total > 0 ? outs.total * multiplier : 0;
+  const madeBoost = madeHand.category === "high-card" ? 0 : Math.round(madeHand.equity * 0.24);
+  const percent = clamp(Math.round(drawEquity + madeBoost), 8, 82);
+  const detail = outs.total > 0
+    ? `${outs.total} estimated outs with ${categoryId === "flop" ? "two cards" : "one card"} to come.`
+    : `${madeHand.label}; equity comes mostly from current showdown value.`;
+
+  return {
+    label: `~${percent}%`,
+    detail,
+  };
+}
+
+function buildQuizOutsProfile(question, categoryId) {
+  if (categoryId === "preflop") {
+    return {
+      total: 0,
+      helpfulCards: describePreflopHelpfulCards(question),
+    };
+  }
+
+  if (categoryId === "river") {
+    return {
+      total: 0,
+      helpfulCards: "No cards remain. The decision is now value, blockers, and showdown frequency.",
+    };
+  }
+
+  const knownCards = getQuizKnownCards(question);
+  const rankCounts = countQuizRanks(knownCards);
+  const suitCounts = countQuizSuits(knownCards);
+  const parts = [];
+  let total = 0;
+
+  const flushDraw = getQuizFlushDraw(suitCounts);
+  if (flushDraw) {
+    total += flushDraw.outs;
+    parts.push(`${flushDraw.outs} ${flushDraw.suitName} complete the flush`);
+  }
+
+  const straightDraw = getQuizStraightOuts(knownCards, rankCounts);
+  if (straightDraw.outs > 0) {
+    total += straightDraw.outs;
+    parts.push(`${straightDraw.labels.join(" or ")} complete a straight (${straightDraw.outs} outs)`);
+  }
+
+  const overcards = getQuizOvercardOuts(question, rankCounts);
+  if (overcards.outs > 0) {
+    total += overcards.outs;
+    parts.push(`${overcards.labels.join(" or ")} can make top-pair strength (${overcards.outs} outs)`);
+  }
+
+  const setOuts = getQuizSetOuts(question, rankCounts);
+  if (setOuts.outs > 0) {
+    total += setOuts.outs;
+    parts.push(`${setOuts.label}s can make a set (${setOuts.outs} outs)`);
+  }
+
+  const madeHand = describeQuizMadeHand(question);
+  if (!parts.length && madeHand.category !== "high-card") {
+    parts.push(`${madeHand.label} is already made; safe blanks and worse value hands are your friend.`);
+  }
+
+  if (!parts.length) {
+    parts.push("No clean draw. Improvement mostly comes from pairing your live cards or using fold equity.");
+  }
+
+  return {
+    total: Math.min(21, total),
+    helpfulCards: parts.join("; "),
+  };
+}
+
+function getQuizChoiceAmount(choice) {
+  const matches = String(choice.label || "").match(/\d+/g);
+  return matches ? Number(matches[matches.length - 1]) : 0;
+}
+
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function inferQuizCallAmount(question) {
+  const wagers = question.opponents
+    .flatMap((opponent) => String(opponent.action || "").match(/\d+/g) || [])
+    .map(Number)
+    .filter((value) => Number.isFinite(value));
+  const largestWager = Math.max(0, ...wagers);
+  const postedBlind = /small/i.test(question.heroPosition) ? 10 : /big/i.test(question.heroPosition) ? 20 : 0;
+  return Math.max(0, largestWager - postedBlind);
+}
+
+function describeQuizStartingHand(question) {
+  const [first, second] = question.heroCards;
+  if (!first || !second) return "Unknown hand";
+  const suited = first.suit === second.suit;
+  const pair = first.label === second.label;
+  if (pair) return `Pocket ${first.label}s`;
+  return `${first.label}-${second.label}${suited ? " suited" : " offsuit"}`;
+}
+
+function describePreflopHelpfulCards(question) {
+  const [first, second] = question.heroCards;
+  if (!first || !second) return "Favorable boards depend on position and ranges.";
+  if (first.label === second.label) {
+    return `${first.label}s can flop a set; low coordinated boards usually preserve pair value.`;
+  }
+  const suited = first.suit === second.suit;
+  const highCards = question.heroCards.filter((card) => card.rankValue >= 11).map((card) => card.label);
+  if (suited) {
+    return `${first.suitName} flops, straight cards, and pairing ${first.label} or ${second.label} improve playability.`;
+  }
+  if (highCards.length) {
+    return `Pairing ${highCards.join(" or ")} makes top-pair value; broadway boards can add straight equity.`;
+  }
+  return `Paired boards, straight-connected boards, and position help this hand realize equity.`;
+}
+
+function estimatePreflopEquity(question) {
+  const [first, second] = question.heroCards;
+  if (!first || !second) return 35;
+  const high = Math.max(first.rankValue, second.rankValue);
+  const low = Math.min(first.rankValue, second.rankValue);
+  const suited = first.suit === second.suit;
+  const pair = first.label === second.label;
+  if (pair) return clamp(45 + high * 2, 52, 85);
+  if (high === 14 && low >= 13) return suited ? 52 : 48;
+  if (high === 14 && low >= 10) return suited ? 47 : 43;
+  if (high >= 13 && low >= 11) return suited ? 44 : 39;
+  if (suited && Math.abs(high - low) <= 2) return 39;
+  if (suited) return 36;
+  return 32;
+}
+
+function getQuizKnownCards(question) {
+  return [...(question.heroCards || []), ...(question.board || [])];
+}
+
+function countQuizRanks(cards) {
+  return cards.reduce((counts, card) => {
+    counts[card.rankValue] = (counts[card.rankValue] || 0) + 1;
+    return counts;
+  }, {});
+}
+
+function countQuizSuits(cards) {
+  return cards.reduce((counts, card) => {
+    counts[card.suit] = (counts[card.suit] || 0) + 1;
+    return counts;
+  }, {});
+}
+
+function getQuizFlushDraw(suitCounts) {
+  const suitNames = {
+    club: "clubs",
+    diamond: "diamonds",
+    heart: "hearts",
+    spade: "spades",
+  };
+  const drawSuit = Object.entries(suitCounts).find(([, count]) => count === 4);
+  if (!drawSuit) return null;
+  const [suit, count] = drawSuit;
+  return {
+    suitName: suitNames[suit] || "suited cards",
+    outs: Math.max(0, 13 - count),
+  };
+}
+
+function getQuizStraightOuts(cards, rankCounts) {
+  const values = new Set(cards.map((card) => card.rankValue));
+  if (values.has(14)) values.add(1);
+  const labels = [];
+  let outs = 0;
+
+  for (let rank = 2; rank <= 14; rank += 1) {
+    const remainingCards = 4 - (rankCounts[rank] || 0);
+    if (remainingCards <= 0) continue;
+    const trialValues = new Set(values);
+    trialValues.add(rank);
+    if (rank === 14) trialValues.add(1);
+    if (hasQuizStraight(trialValues)) {
+      labels.push(QUIZ_RANK_LABELS[rank]);
+      outs += remainingCards;
+    }
+  }
+
+  return { labels, outs };
+}
+
+function hasQuizStraight(values) {
+  for (let start = 1; start <= 10; start += 1) {
+    let complete = true;
+    for (let offset = 0; offset < 5; offset += 1) {
+      if (!values.has(start + offset)) {
+        complete = false;
+        break;
+      }
+    }
+    if (complete) return true;
+  }
+  return false;
+}
+
+function getQuizOvercardOuts(question, rankCounts) {
+  if (!question.board?.length) return { labels: [], outs: 0 };
+  const boardMax = Math.max(...question.board.map((card) => card.rankValue));
+  const labels = [];
+  let outs = 0;
+  question.heroCards.forEach((card) => {
+    if (card.rankValue > boardMax && (rankCounts[card.rankValue] || 0) === 1) {
+      labels.push(card.label);
+      outs += 3;
+    }
+  });
+  return { labels, outs };
+}
+
+function getQuizSetOuts(question, rankCounts) {
+  const [first, second] = question.heroCards;
+  if (!first || !second || first.label !== second.label) return { label: "", outs: 0 };
+  const count = rankCounts[first.rankValue] || 0;
+  if (count >= 3) return { label: "", outs: 0 };
+  return {
+    label: first.label,
+    outs: Math.max(0, 4 - count),
+  };
+}
+
+function describeQuizMadeHand(question) {
+  const cards = getQuizKnownCards(question);
+  const rankCounts = Object.values(countQuizRanks(cards));
+  const suitCounts = Object.values(countQuizSuits(cards));
+  const pairs = rankCounts.filter((count) => count >= 2).length;
+  const trips = rankCounts.some((count) => count === 3);
+  const quads = rankCounts.some((count) => count === 4);
+  const values = new Set(cards.map((card) => card.rankValue));
+  if (values.has(14)) values.add(1);
+  const hasFlush = suitCounts.some((count) => count >= 5);
+  const hasStraight = hasQuizStraight(values);
+
+  if (hasFlush && hasStraight) return { category: "straight-flush", label: "Straight flush/monster draw texture", equity: 95 };
+  if (quads) return { category: "quads", label: "Four of a kind", equity: 96 };
+  if (trips && pairs >= 2) return { category: "full-house", label: "Full house", equity: 92 };
+  if (hasFlush) return { category: "flush", label: "Flush", equity: 86 };
+  if (hasStraight) return { category: "straight", label: "Straight", equity: 82 };
+  if (trips) return { category: "trips", label: "Three of a kind", equity: 76 };
+  if (pairs >= 2) return { category: "two-pair", label: "Two pair", equity: 70 };
+  if (pairs === 1) {
+    const boardMax = question.board?.length ? Math.max(...question.board.map((card) => card.rankValue)) : 0;
+    const heroPairRank = question.heroCards.find((card) => (cards.filter((known) => known.rankValue === card.rankValue).length) >= 2);
+    if (heroPairRank && heroPairRank.rankValue > boardMax) {
+      return { category: "overpair", label: "Overpair", equity: 66 };
+    }
+    if (heroPairRank && heroPairRank.rankValue === boardMax) {
+      return { category: "top-pair", label: "Top pair", equity: 58 };
+    }
+    return { category: "pair", label: "One pair", equity: 44 };
+  }
+
+  return { category: "high-card", label: "High card", equity: 22 };
 }
 
 function renderQuizPositionLens(question) {
@@ -2685,7 +3232,8 @@ function renderQuizSeatMap(question) {
 
   return QUIZ_TABLE_POSITIONS.map((position, index) => {
     const isHero = position.id === heroPositionId;
-    const action = isHero ? getQuizHeroStatus(actionByPosition.get(position.id)) : actionByPosition.get(position.id) || position.status;
+    const rawAction = isHero ? getQuizHeroStatus(actionByPosition.get(position.id)) : actionByPosition.get(position.id);
+    const action = formatQuizSeatStatus(rawAction || position.status, isHero);
     const statusClass = getQuizStatusClass(action, isHero);
     const seatName = isHero ? "You" : position.defaultName;
     const cards = isHero
@@ -2747,10 +3295,21 @@ function getQuizHeroStatus(previousAction) {
   return "Your decision";
 }
 
+function formatQuizSeatStatus(action, isHero = false) {
+  const normalized = String(action || "").trim();
+  if (isHero) return normalized || "Your decision";
+  if (!normalized || /^waiting$/i.test(normalized)) return "Gone";
+  if (/^folds?$/i.test(normalized) || /^folded$/i.test(normalized)) return "Folded";
+  if (/^still to act$/i.test(normalized)) return "In hand";
+  return normalized;
+}
+
 function getQuizStatusClass(action, isHero) {
   if (isHero) return "is-decision";
-  if (/fold/i.test(action)) return "is-folded";
+  if (/^gone$/i.test(action)) return "is-out";
+  if (/^folded$/i.test(action) || /^folds?$/i.test(action)) return "is-folded";
   if (/3-bet|raise|open|bet|call/i.test(action)) return "is-aggressor";
+  if (/check|in hand|still to act/i.test(action)) return "is-in-hand";
   if (/post/i.test(action)) return "is-posted";
   return "is-waiting";
 }
@@ -2758,10 +3317,20 @@ function getQuizStatusClass(action, isHero) {
 function renderQuizNavigator(categoryId, questionIndex, questionCount, selectedChoice) {
   const isFirst = questionIndex === 0;
   const isLast = questionIndex >= questionCount - 1;
-  els.quizProgressLabel.textContent = `Question ${questionIndex + 1} of ${questionCount}`;
-  els.quizPrevButton.disabled = isFirst;
-  els.quizNextButton.disabled = !selectedChoice || isLast;
-  els.quizNextButton.textContent = isLast ? "Done" : "Next";
+  const progressText = `Question ${questionIndex + 1} of ${questionCount}`;
+  els.quizProgressLabels.forEach((label) => {
+    label.textContent = progressText;
+  });
+  els.quizNavButtons.forEach((button) => {
+    const direction = Number(button.dataset.quizNav || 0);
+    if (direction < 0) {
+      button.disabled = isFirst;
+      button.textContent = "Previous";
+    } else {
+      button.disabled = !selectedChoice || isLast;
+      button.textContent = isLast ? "Done" : "Next";
+    }
+  });
   if (!selectedChoice) {
     els.quizNavigatorHint.textContent = "Answer this spot to unlock the next question.";
   } else if (isLast) {
@@ -2785,6 +3354,7 @@ function moveQuizQuestion(direction) {
   state.quizQuestionIndexByCategory[categoryId] = nextIndex;
   state.quizSelectedChoice = getCurrentQuizAnswerId(categoryId, nextIndex);
   renderQuiz();
+  focusQuizQuestion();
 }
 
 function getQuizQuestionList(categoryId = state.quizCategory) {
@@ -3435,6 +4005,9 @@ function quizCard(label, suit) {
   }[suit] || { symbol: "♣", color: "black", name: "clubs" };
   return {
     label,
+    suit,
+    suitName: suitData.name,
+    rankValue: QUIZ_RANK_VALUES[label] || Number(label) || 0,
     suitSymbol: suitData.symbol,
     color: suitData.color,
     display: `${label} of ${suitData.name}`,
